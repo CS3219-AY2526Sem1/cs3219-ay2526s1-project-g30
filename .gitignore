@@ -1,0 +1,6 @@
+# Dependencies
+/node_modules
+
+# Environment Variables
+# This will ignore any file ending in .env in any folder
+**/.*env
