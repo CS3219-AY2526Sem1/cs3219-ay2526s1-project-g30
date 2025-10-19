@@ -8,11 +8,14 @@ const userSchema = new mongoose.Schema({
   passwordHistory: { type: [String], select: false},
   passwordResetToken: String,
   passwordResetExpires: Date,
-  gender: { type: String, enum: ['male', 'female', 'Prefer not to say'], default: ''},
+  gender: { type: String, enum: ['Male', 'Female', 'Nil'], default: 'Nil'},
   aboutMeInformation: { type: String, required: false, default: ''},
   skillLevel: { type: String, enum: ['beginner','intermediate','advanced'], default: 'beginner' },
   preferredTopics: [String],
   profilePictureUrl: { type: String },
+  isEmailVerified: { type: Boolean, default: false },
+  emailVerificationToken: String,
+  emailVerificationTokenExpires: Date,
 }, {
   timestamps: true
 });
