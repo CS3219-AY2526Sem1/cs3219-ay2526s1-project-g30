@@ -1,31 +1,42 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto'); // Built-in Node.js library
-const sendEmail = require('../utils/sendEmail'); // Import the email utility
+const crypto = require('crypto');
+const sendEmail = require('../utils/sendEmail'); 
 
 exports.registerUser = async (req, res) => {
-  const { username, email, password } = req.body; 
+  const { username, email, password } = req.body;
 
   try {
+    const userExists = await User.findOne({ $or: [{ email }, { username }] });
+
+    if (userExists) {
+      return res.status(400).json({ message: 'A user with that email or username already exists.' });
+    }
+    
+    const defaultProfilePic = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random&color=fff`;
+
     const user = await User.create({
       username,
       email,
       password,
+      profilePictureUrl: defaultProfilePic,
     });
-    
-    res.status(201).json({ message: 'User registered successfully', userId: user._id });
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      userId: user._id,
+      profilePictureUrl: user.profilePictureUrl,
+    });
 
   } catch (err) {
-    console.error(err); 
+    console.error(err);
     res.status(500).send('Server Error');
   }
 };
 
 exports.getUserProfile = async (req, res) => {
   try {
-    // Find the user by the ID provided in the URL parameter
-    // .select('-password') ensures the hashed password is not sent back
     const user = await User.findById(req.params.id).select('-password');
 
     if (user) {
@@ -43,22 +54,18 @@ exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Find user by email. We must use .select('+password') to get the password
-    // because we set select: false in the model.
     const user = await User.findOne({ email }).select('+password');
 
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Compare the plaintext password from the request with the hashed password in the database
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // User is valid, create a JWT
     const payload = {
       user: {
         id: user.id,
@@ -67,8 +74,8 @@ exports.loginUser = async (req, res) => {
 
     jwt.sign(
       payload,
-      process.env.JWT_SECRET, // You need to add JWT_SECRET to your .env file
-      { expiresIn: '5h' }, // Token expires in 5 hours
+      process.env.JWT_SECRET,
+      { expiresIn: '5h' }, 
       (err, token) => {
         if (err) throw err;
         res.json({ token });
@@ -81,17 +88,27 @@ exports.loginUser = async (req, res) => {
 };
 
 exports.updateUserProfile = async (req, res) => {
-  // The user object is attached to the request in the 'protect' middleware
   const user = await User.findById(req.user.id);
 
   if (user) {
-    // Update fields if they are provided in the request body
-    user.username = req.body.username || user.username;
-    user.email = req.body.email || user.email;
-    user.gender = req.body.gender || user.gender;
-    user.aboutMeInformation = req.body.aboutMeInformation || user.aboutMeInformation;
-    user.skillLevel = req.body.skillLevel || user.skillLevel;
-    user.preferredTopics = req.body.preferredTopics || user.preferredTopics;
+    if (req.body.username !== undefined) {
+      user.username = req.body.username;
+    }
+    if (req.body.email !== undefined) {
+      user.email = req.body.email;
+    }
+    if (req.body.gender !== undefined) {
+      user.gender = req.body.gender;
+    }
+    if (req.body.aboutMeInformation !== undefined) {
+      user.aboutMeInformation = req.body.aboutMeInformation;
+    }
+    if (req.body.skillLevel !== undefined) {
+      user.skillLevel = req.body.skillLevel;
+    }
+    if (req.body.preferredTopics !== undefined) {
+      user.preferredTopics = req.body.preferredTopics;
+    }
 
     const updatedUser = await user.save();
 
@@ -99,7 +116,11 @@ exports.updateUserProfile = async (req, res) => {
       _id: updatedUser._id,
       username: updatedUser.username,
       email: updatedUser.email,
-      // ...return any other fields you want
+      gender: updatedUser.gender,
+      aboutMeInformation: updatedUser.aboutMeInformation,
+      skillLevel: updatedUser.skillLevel,
+      preferredTopics: updatedUser.preferredTopics,
+      profilePictureUrl: updatedUser.profilePictureUrl
     });
   } else {
     res.status(404).json({ message: 'User not found' });
@@ -192,4 +213,32 @@ exports.resetPassword = async (req, res) => {
   await user.save();
 
   res.json({ message: 'Password has been reset successfully.' });
+};
+
+exports.uploadProfilePicture = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Please upload a file' });
+    }
+
+    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+
+    user.profilePictureUrl = imageUrl;
+    await user.save();
+
+    res.json({
+      message: 'Profile picture updated successfully',
+      profilePictureUrl: user.profilePictureUrl,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Server Error');
+  }
 };

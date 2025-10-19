@@ -8,15 +8,15 @@ const userSchema = new mongoose.Schema({
   passwordHistory: { type: [String], select: false},
   passwordResetToken: String,
   passwordResetExpires: Date,
-  gender: {type : String, required: false},
-  aboutMeInformation: { type: String, required: false },
+  gender: { type: String, enum: ['male', 'female', 'Prefer not to say'], default: ''},
+  aboutMeInformation: { type: String, required: false, default: ''},
   skillLevel: { type: String, enum: ['beginner','intermediate','advanced'], default: 'beginner' },
   preferredTopics: [String],
+  profilePictureUrl: { type: String },
 }, {
   timestamps: true
 });
 
-// This pre-save hook for hashing new passwords remains the same
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {
     return next();
@@ -27,13 +27,12 @@ userSchema.pre('save', async function(next) {
   next();
 });
 
-// Helper method to check for reused passwords
 userSchema.methods.isPasswordReused = async function(newPassword) {
   for (const oldPasswordHash of this.passwordHistory) {
     const isMatch = await bcrypt.compare(newPassword, oldPasswordHash);
-    if (isMatch) return true; // Password was reused
+    if (isMatch) return true;
   }
-  return false; // Password is new
+  return false; 
 };
 
 module.exports = mongoose.model('User', userSchema);

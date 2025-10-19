@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 require('dotenv').config(); // Loads environment variables from .env file
 const connectDB = require('./src/config/db');
 const userRoutes = require('./src/routes/userRoutes');
@@ -11,6 +12,9 @@ const app = express();
 // Middleware to parse incoming JSON requests
 // This allows us to access request body data via req.body
 app.use(express.json());
+
+// Serve static files from the 'uploads' directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Define a basic route for the root URL
 app.get('/', (req, res) => {
