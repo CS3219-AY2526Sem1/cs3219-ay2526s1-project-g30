@@ -11,6 +11,8 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const timeoutMin = 15;
+const ipAddress = '192.168.45.130';
+
 // MongoDB setup
 // const mongoLocalUrl = 'mongodb://localhost:27017';
 const mongoOnlineUrl = process.env.MONGO_DB_URL;
@@ -211,15 +213,16 @@ wss.on('connection', (ws) => {
       // When user updates the code update the db and broadcast to users in the session
       if (data.type === 'update' && clientSession && authenticated) {
         // Save to MongoDB
-        await dbSessions.updateOne(
-          { sessionId: clientSession },
-          { 
-            $set: { 
-              content: data.content, 
-              updatedAt: new Date() 
-            } 
-          }
-        );
+        // console.log("Saved to db");
+        // await dbSessions.updateOne(
+        //   { sessionId: clientSession },
+        //   { 
+        //     $set: { 
+        //       content: data.content, 
+        //       updatedAt: new Date() 
+        //     } 
+        //   }
+        // );
 
         // Broadcast to other user in the same session
         // !!!!!!!!!! LOOK INTO IF I SHOULD BROADCAST TO BOTH USERS OR JUST THE ONE THAT DID NOT MAKE THE UPDATE !!!!!!!!!!!!!!!!!!!!!!!
@@ -237,6 +240,7 @@ wss.on('connection', (ws) => {
                 type: 'update',
                 content: data.content
               }));
+              console.log(`sent to user at ${new Date()}`);
             }
           });
         }
@@ -366,6 +370,25 @@ function broadcastToSession(session, data) {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+
+// Get local IP address
+const os = require('os');
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      // Skip internal and non-IPv4 addresses
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
+
+server.listen(PORT, '0.0.0.0', () => {
+  const localIP = getLocalIP();
+  console.log(`\nServer running on port ${PORT}`);
+  console.log(`Local network access: http://${localIP}:${PORT}`);
+  console.log(`Localhost access: http://localhost:${PORT}`);
 });
