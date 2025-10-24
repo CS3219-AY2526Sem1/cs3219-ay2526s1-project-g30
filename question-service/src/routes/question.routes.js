@@ -24,10 +24,13 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
     try {
-        const {title, description, difficulty, category, examples, imageURL} = req.body;
+        const {title, description, difficulty, category, examples, function_name, function_params} = req.body;
 
         if (!title || !difficulty) {
             return res.status(400).json({message: 'Title and difficulty are required.'});
+        }
+        if (!function_params) {
+            return res.status(400).json({message: 'Function parameters are required.'});
         }
 
         const newQuestion = new Question({
@@ -36,7 +39,8 @@ router.post('/', async (req, res) => {
             difficulty,
             category,
             examples,
-            imageURL
+            function_name,
+            function_params
         });
 
         const savedQuestion = await newQuestion.save();
