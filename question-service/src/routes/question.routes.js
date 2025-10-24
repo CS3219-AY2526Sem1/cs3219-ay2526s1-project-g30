@@ -16,7 +16,7 @@ router.get('/randomQuestion', async (req, res) => {
         const [question] = await Question.aggregate([
             { $match: matchStage },
             { $sample: { size: 1 } },
-            { $project: { _id: 1 } } 
+            { $project: { _id: 1 } }
         ]);
 
         if (!question) {
