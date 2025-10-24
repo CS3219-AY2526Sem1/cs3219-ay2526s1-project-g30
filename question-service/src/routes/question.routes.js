@@ -4,23 +4,32 @@ import Question from '../models/question.model.js';
 const router = express.Router();
 
 // Get a random question by difficulty and category
-router.get('/', async (req, res) => {
+router.get('/randomQuestion', async (req, res) => {
     try {
-        const {difficulty, category} = req.query;
-        const filter = {};
-        if (difficulty) filter.difficulty = difficulty;
-        if (category) filter.category = category;
+        const { difficulty, category } = req.query;
 
-        const questions = await Question.find(filter);
-        if (questions.length === 0)
-            return res.status(404).json({message: 'No questions found'});
+        // Build filter
+        const matchStage = {};
+        if (difficulty) matchStage.difficulty = difficulty;
+        if (category) matchStage.category = category;
 
-        const random = questions[Math.floor(Math.random() * questions.length)];
-        res.json(random);
+        // Aggregate pipeline with $match and $sample
+        const [question] = await Question.aggregate([
+            { $match: matchStage },
+            { $sample: { size: 1 } }
+        ]);
+
+        if (!question) {
+            return res.status(404).json({ message: 'No questions found' });
+        }
+
+        res.json(question);
     } catch (err) {
-        res.status(500).json({message: err.message});
+        console.error(err);
+        res.status(500).json({ message: err.message });
     }
 });
+
 
 router.post('/', async (req, res) => {
     try {
