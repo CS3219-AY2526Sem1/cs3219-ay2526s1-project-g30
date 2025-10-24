@@ -8,27 +8,28 @@ router.get('/randomQuestion', async (req, res) => {
     try {
         const { difficulty, category } = req.query;
 
-        // Build filter
         const matchStage = {};
         if (difficulty) matchStage.difficulty = difficulty;
         if (category) matchStage.category = category;
 
-        // Aggregate pipeline with $match and $sample
+        // Aggregate pipeline: match, sample, project only _id
         const [question] = await Question.aggregate([
             { $match: matchStage },
-            { $sample: { size: 1 } }
+            { $sample: { size: 1 } },
+            { $project: { _id: 1 } } 
         ]);
 
         if (!question) {
             return res.status(404).json({ message: 'No questions found' });
         }
 
-        res.json(question);
+        res.json({ id: question._id });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: err.message });
     }
 });
+
 
 // get a specific question by ID
 router.get('/:id', async (req, res) => {
