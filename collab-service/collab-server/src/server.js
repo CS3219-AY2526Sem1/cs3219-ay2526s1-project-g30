@@ -116,7 +116,7 @@ const server = http.createServer((req, res) => {
 
           // Fetch default template for language from mongoDb
 
-          // Add the new YDoc with default tempalte to the session
+          // Add the new YDoc with default template to the session
           newSession.setYDoc(createYDoc(session))
           console.log('New session created (', user1, ',', user2, '):', session)
           sessions.set(session, newSession)
