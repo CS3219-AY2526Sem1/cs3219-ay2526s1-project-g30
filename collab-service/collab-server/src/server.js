@@ -23,7 +23,15 @@ const dbTemplateName = 'default_templates'
 let dbSessions, dbTemplates
 
 // Connect to MongoDB
-MongoClient.connect(mongoOnlineUrl)
+MongoClient.connect(mongoOnlineUrl, {
+  serverSelectionTimeoutMS: 5000,
+  connectTimeoutMS: 10000,
+  // CRITICAL: Add these TLS options
+  tls: true,
+  tlsAllowInvalidCertificates: true, // Needed for Cloud Run
+  retryWrites: true,
+  retryReads: true,
+})
   .then(client => {
     console.log('Connected to MongoDB')
     dbSessions = client.db(dbSessionName).collection('sessions')
