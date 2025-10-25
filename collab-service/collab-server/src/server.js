@@ -7,30 +7,30 @@ import path from 'path'
 import os from 'os'
 import * as number from 'lib0/number.js'
 import { Session } from './session.js'
-import { constants } from 'crypto';
+import { constants } from 'crypto'
 import { setupWSConnection, createYDoc, sessions } from './utils.js'
-import { MongoClient } from 'mongodb'
+import { MongoClient, MongoError } from 'mongodb'
 
 // .env file config
 dotenv.config()
 
 
 // MongoDB setup
-// const mongoLocalUrl = 'mongodb://localhost:27017';
-const mongoOnlineUrl = process.env.MONGO_DB_URL || 'mongodb://localhost:27017';
-const dbSessionName = 'session_storage';
-const dbTemplateName = 'default_templates';
-let dbSessions, dbTemplates;
+// const mongoLocalUrl = 'mongodb://localhost:27017'
+const mongoOnlineUrl = process.env.MONGO_DB_URL || 'mongodb://localhost:27017'
+const dbSessionName = 'session_storage'
+const dbTemplateName = 'default_templates'
+let dbSessions, dbTemplates
 
 // Connect to MongoDB
 MongoClient.connect(mongoOnlineUrl)
   .then(client => {
-    console.log('Connected to MongoDB');
-    dbSessions = client.db(dbSessionName).collection('sessions');
-    dbTemplates = client.db(dbTemplateName).collection('templates');
+    console.log('Connected to MongoDB')
+    dbSessions = client.db(dbSessionName).collection('sessions')
+    dbTemplates = client.db(dbTemplateName).collection('templates')
     setInterval(() => {
-        //closeInactiveSessionsInDb();
-    }, 1000 * 60);
+        //closeInactiveSessionsInDb()
+    }, 1000 * 60)
 })
 .catch(err => console.error('MongoDB connection error:', err))
 .then(async () => {
@@ -53,7 +53,7 @@ MongoClient.connect(mongoOnlineUrl)
     }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
     newSession.scheduledUpdater = scheduledUpdater
   }
-});
+})
 
 
 // HTTPS server setup
@@ -83,10 +83,10 @@ const server = https.createServer(sslOptions, (req, res) => {
   // POST request to create session
   else if (req.method === 'POST' && req.url === '/api/session') {
     // This is a POST request
-    let body = [];
+    let body = []
     req.on('data', (chunk) => {
-        body.push(chunk);
-    });
+        body.push(chunk)
+    })
     req.on('end', async () => {
       try {
         const jsonBody = JSON.parse(Buffer.concat(body).toString())
@@ -102,7 +102,7 @@ const server = https.createServer(sslOptions, (req, res) => {
           const newSession = new Session(session, user1, user2, programmingLang, question, new Date())
           
           // Create a record in the db first with empty content
-          const ret = await dbSessions.insertOne(newSession.getJsonified());
+          const ret = await dbSessions.insertOne(newSession.getJsonified())
           
           // Send req to question server to get parameters and function 
 
@@ -120,7 +120,7 @@ const server = https.createServer(sslOptions, (req, res) => {
               await dbSessions.updateOne(queryupdate[0], queryupdate[1], {upsert: false} )
               console.log(session, 'content updated')
             }
-          }, number.parseInt(process.env.SESSION_UPDATE || '60000'));
+          }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
           
           newSession.scheduledUpdater = scheduledUpdater
           res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -129,7 +129,7 @@ const server = https.createServer(sslOptions, (req, res) => {
     
       } catch (e) {
         console.log(e)
-        if (e.code === 11000) {
+        if (e instanceof MongoError && e.code === 11000) {
           res.writeHead(409, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ status: 'Duplicate session', time: new Date().toISOString() }))
         } else {
@@ -137,7 +137,7 @@ const server = https.createServer(sslOptions, (req, res) => {
           res.end(JSON.stringify({ status: 'Internal Server Error', time: new Date().toISOString() }))
         }
       }
-    });
+    })
   }
   // Unhandled requests
   else {
@@ -159,7 +159,7 @@ wss.on('connection', setupWSConnection)
 
 // Function to just call when socket has some error
 function onSocketError(err) {
-  console.error(err);
+  console.error(err)
 }
 
 server.on('upgrade', (request, socket, head) => {
@@ -167,14 +167,14 @@ server.on('upgrade', (request, socket, head) => {
   // Call `wss.HandleUpgrade` *after* you checked whether the client has access
   // (e.g. by checking cookies, or url parameters).
   // See https://github.com/websockets/ws#client-authentication
-  socket.on('error', onSocketError);
+  socket.on('error', onSocketError)
 
   const parsedURL = new URL((process.env.SERVER_URL || '') + request.url)
   const sessionId = (parsedURL.pathname || '').slice(1)
   const userid = parsedURL.searchParams.get('userid') || ''
 
   if (sessions.has(sessionId) && sessions.get(sessionId)?.isValidUser(userid)) {
-    socket.removeListener('error', onSocketError);
+    socket.removeListener('error', onSocketError)
     wss.handleUpgrade(request, socket, head, /** @param {any} ws */ ws => {
       wss.emit('connection', ws, request)
       console.log(userid, 'joined', sessionId)
@@ -217,10 +217,12 @@ server.listen(PORT, HOST, () => {
   console.log(`Local: wss://localhost:${PORT}`)
   
   Object.keys(interfaces).forEach(ifname => {
-    interfaces[ifname].forEach(iface => {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        console.log(`Network: wss://${iface.address}:${PORT}`)
-      }
-    });
-  });
-});
+    if (interfaces[ifname]) {
+      interfaces[ifname].forEach(iface => {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          console.log(`Network: wss://${iface.address}:${PORT}`)
+        }
+      })
+    }
+  })
+})

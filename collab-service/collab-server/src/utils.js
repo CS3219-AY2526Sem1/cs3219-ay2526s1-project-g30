@@ -160,8 +160,9 @@ export const createYDoc = (docname, defaultContent = 'This is the default conten
   doc.gc = true
   doc.getText('monaco').insert(0, defaultContent)
   doc.on('afterTransaction', () => {
-    if (sessions.has(docname)) {
-      sessions.get(docname).updated = true
+    const session = sessions.get(docname)
+    if (session) {
+      session.updated = true
     }
   })
   if (persistence !== null) {
@@ -260,6 +261,10 @@ export const setupWSConnection = (conn, req, { docName = (req.url || '').slice(1
   conn.binaryType = 'arraybuffer'
   // get doc, initialize if it does not exist yet
   const session = sessions.get(docName) //getYDoc(docName, gc)
+  if (!session) {
+    closeConn(new WSSharedDoc('unknown'), conn, 4001, 'Session does not exist or has ended')
+    return
+  }
   const doc = session.getYDoc()
   doc.conns.set(conn, new Set())
   // listen and reply to events

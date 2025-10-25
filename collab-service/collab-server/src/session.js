@@ -2,14 +2,14 @@ import { closeAllConn } from './utils.js'
 
 export class Session {
     constructor(sessionId, userId1, userId2, language, question, start) {
-        this.sessionId = sessionId;
-        this.user1 = userId1;
-        this.user2 = userId2;
-        this.language = language;
-        this.question = question;
-        this.startTime = start;
-        this.endTime = new Date(this.startTime);
-        this.endTime.setMinutes(this.startTime.getMinutes() + 60);
+        this.sessionId = sessionId
+        this.user1 = userId1
+        this.user2 = userId2
+        this.language = language
+        this.question = question
+        this.startTime = start
+        this.endTime = new Date(this.startTime)
+        this.endTime.setMinutes(this.startTime.getMinutes() + 60)
         this.status = 'Active'
         this.updated = true
         this.scheduledUpdater = null // To be destroyed when session is destroyed
@@ -17,17 +17,17 @@ export class Session {
 
     isValidUser(user) {
         if (this.user1 === user || this.user2 === user) {
-            return true;
+            return true
         }
-        return false;
+        return false
     }
 
     setYDoc(doc) {
-        this.yDoc = doc; 
+        this.yDoc = doc
     }
 
     getYDoc() {
-        return this.yDoc;
+        return this.yDoc
     }
 
     getJsonified() {
