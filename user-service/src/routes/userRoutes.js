@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const path = require('path');
 const multer = require('multer');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -18,16 +17,18 @@ const {
   addCompletedQuestion,
 } = require('../controllers/userController');
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); 
-  },
-  filename: function (req, file, cb) {
-    cb(null, `${req.user.id}-${Date.now()}${path.extname(file.originalname)}`);
-  },
-});
+const storage = multer.memoryStorage();
 
-const upload = multer({ storage: storage });
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image')) {
+    cb(null, true); // Accept the file
+  } else {
+    // Reject the file and provide an error message
+    cb(new Error('Invalid file type. Only images are allowed.'), false);
+  }
+};
+
+const upload = multer({ storage: storage, fileFilter: fileFilter });
 
 // Public Routes
 router.post('/register', registerUser); 
