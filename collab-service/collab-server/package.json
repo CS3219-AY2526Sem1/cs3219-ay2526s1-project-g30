@@ -1,0 +1,91 @@
+{
+  "name": "@y/websocket-server",
+  "version": "0.1.1",
+  "description": "Backend for y-websocket",
+  "keywords": [
+    "Yjs"
+  ],
+  "homepage": "https://github.com/yjs/y-websocket-server#readme",
+  "bugs": {
+    "url": "https://github.com/yjs/y-websocket-server/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yjs/y-websocket-server.git"
+  },
+  "funding": {
+    "type": "GitHub Sponsors ❤",
+    "url": "https://github.com/sponsors/dmonad"
+  },
+  "license": "MIT",
+  "author": "Kevin Jahns <kevin.jahns@protonmail.com>",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    "./utils": {
+      "import": "./src/utils.js",
+      "require": "./dist/utils.cjs",
+      "types": "./dist/src/utils.d.ts",
+      "default": "./src/utils.js"
+    },
+    "./callback": {
+      "import": "./src/callback.js",
+      "require": "./dist/callback.cjs",
+      "types": "./dist/src/callback.d.ts",
+      "default": "./src/callback.js"
+    }
+  },
+  "main": "index.js",
+  "bin": {
+    "y-websocket-server": "src/server.js",
+    "y-websocket": "src/server.js"
+  },
+  "files": [
+    "dist/*",
+    "src/*"
+  ],
+  "scripts": {
+    "start": "node ./src/server.js",
+    "dist": "rm -rf dist && rollup -c && tsc",
+    "lint": "standard && tsc",
+    "test": "npm run lint",
+    "preversion": "npm run lint && npm run dist && test -e dist/src/server.d.ts && test -e dist/server.cjs"
+  },
+  "dependencies": {
+    "@y/protocols": "^1.0.6-1",
+    "constants": "^0.0.2",
+    "crypto": "^1.0.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "fs": "^0.0.1-security",
+    "https": "^1.0.0",
+    "lib0": "^0.2.102",
+    "mongodb": "^6.20.0",
+    "os": "^0.1.2",
+    "path": "^0.12.7",
+    "url": "^0.11.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "@types/ws": "^8.5.10",
+    "rollup": "^4.39.0",
+    "standard": "^17.1.2",
+    "typescript": "^5.8.3",
+    "ws": "^6.2.1",
+    "yjs": "^14.0.0-7"
+  },
+  "peerDependencies": {
+    "yjs": "^14.0.0-7"
+  },
+  "engines": {
+    "npm": ">=8.0.0",
+    "node": ">=16.0.0"
+  },
+  "sideEffects": false,
+  "standard": {
+    "ignore": [
+      "/dist",
+      "/node_modules"
+    ]
+  }
+}
