@@ -42,7 +42,7 @@ function App() {
       console.log(event.code)
       if (event.code === 1006) {
         alert("Could not establish connection to server")
-      } if (event.code === 3000) {
+      } else if (event.code === 3000) {
         alert(event.reason)
       } else {
         console.log("uncaught close code")
