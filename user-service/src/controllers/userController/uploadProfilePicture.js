@@ -1,4 +1,10 @@
 const User = require('../../models/User');
+const { Storage } = require('@google-cloud/storage');
+const path = require('path');
+
+const storage = new Storage();
+const bucketName = 'your-gcs-bucket-name';
+const bucket = storage.bucket(bucketName);
 
 const uploadProfilePicture = async (req, res) => {
   try {
@@ -12,15 +18,35 @@ const uploadProfilePicture = async (req, res) => {
       return res.status(400).json({ message: 'Please upload a file' });
     }
 
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    const blobName = `${req.user.id}-${Date.now()}${path.extname(req.file.originalname)}`;
+    const blob = bucket.file(blobName);
 
-    user.profilePictureUrl = imageUrl;
-    await user.save();
-
-    res.json({
-      message: 'Profile picture updated successfully',
-      profilePictureUrl: user.profilePictureUrl,
+    const blobStream = blob.createWriteStream({
+      resumable: false,
+      contentType: req.file.mimetype,
     });
+
+    blobStream.on('error', (err) => {
+      console.error(err);
+      res.status(500).send('Error uploading image.');
+    });
+
+    blobStream.on('finish', async () => {
+      // Construct the public URL (ensure your bucket has public access configured)
+      const publicUrl = `https://storage.googleapis.com/${peerprep-user-service}/${blobName}`;
+
+      // Update the user's profilePictureUrl in the database
+      user.profilePictureUrl = publicUrl;
+      await user.save();
+
+      res.json({
+        message: 'Profile picture updated successfully',
+        profilePictureUrl: user.profilePictureUrl,
+      });
+    });
+
+    blobStream.end(req.file.buffer);
+
   } catch (err) {
     console.error(err);
     res.status(500).send('Server Error');
