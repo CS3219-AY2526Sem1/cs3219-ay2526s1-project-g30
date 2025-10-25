@@ -12,17 +12,13 @@ router.get('/randomQuestion', async (req, res) => {
         if (difficulty) matchStage.difficulty = difficulty;
         if (category) matchStage.category = category;
 
-        // Aggregate pipeline: match, sample, project only _id
-        const [question] = await Question.aggregate([
-            { $match: matchStage },
-            { $sample: { size: 1 } },
-            { $project: { _id: 1 } }
-        ]);
-
-        if (!question) {
+        // Efficient random selection: count, random skip, project only _id
+        const count = await Question.countDocuments(matchStage);
+        if (count === 0) {
             return res.status(404).json({ message: 'No questions found' });
         }
-
+        const random = Math.floor(Math.random() * count);
+        const question = await Question.findOne(matchStage, { _id: 1 }).skip(random);
         res.json({ id: question._id });
     } catch (err) {
         console.error(err);
