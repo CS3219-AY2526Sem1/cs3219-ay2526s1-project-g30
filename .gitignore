@@ -1,5 +1,3 @@
-/collaboration-service/.env
-/collaboration-service/.vscode
 *.un~
 /node_modules
 **/.*env
