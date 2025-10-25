@@ -53,7 +53,17 @@
   },
   "dependencies": {
     "@y/protocols": "^1.0.6-1",
-    "lib0": "^0.2.102"
+    "constants": "^0.0.2",
+    "crypto": "^1.0.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "fs": "^0.0.1-security",
+    "https": "^1.0.0",
+    "lib0": "^0.2.102",
+    "mongodb": "^6.20.0",
+    "os": "^0.1.2",
+    "path": "^0.12.7",
+    "url": "^0.11.4"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",

@@ -1,57 +1,198 @@
 #!/usr/bin/env node
-
+import dotenv from 'dotenv'
 import WebSocket from 'ws'
-import http from 'http'
+import https from 'https'
+import fs from 'fs'
+import path from 'path'
+import os from 'os'
 import * as number from 'lib0/number.js'
-import { setupWSConnection } from './utils.js'
+import { Session } from './session.js'
+import { constants } from 'crypto';
+import { setupWSConnection, createYDoc, sessions } from './utils.js'
+import { MongoClient } from 'mongodb'
 
-const wss = new WebSocket.Server({ noServer: true })
-const host = process.env.HOST || 'localhost'
-const PORT = number.parseInt(process.env.PORT || '1234')
+// .env file config
+dotenv.config()
 
-const server = http.createServer((_request, response) => {
-  response.writeHead(200, { 'Content-Type': 'text/plain' })
-  response.end('okay')
+
+// MongoDB setup
+// const mongoLocalUrl = 'mongodb://localhost:27017';
+const mongoOnlineUrl = process.env.MONGO_DB_URL || 'mongodb://localhost:27017';
+const dbSessionName = 'session_storage';
+const dbTemplateName = 'default_templates';
+let dbSessions, dbTemplates;
+
+// Connect to MongoDB
+MongoClient.connect(mongoOnlineUrl)
+  .then(client => {
+    console.log('Connected to MongoDB');
+    dbSessions = client.db(dbSessionName).collection('sessions');
+    dbTemplates = client.db(dbTemplateName).collection('templates');
+    setInterval(() => {
+        //closeInactiveSessionsInDb();
+    }, 1000 * 60);
+})
+.catch(err => console.error('MongoDB connection error:', err))
+.then(async () => {
+  // Load active sessions from MongoDB on server start
+  const findResult = await dbSessions.find({ status: 'Active' })
+  for await (const storedSession of findResult) {
+    const newSession = new Session(storedSession.sessionId, storedSession.user1, storedSession.user2,
+      storedSession.language, storedSession.question, storedSession.startTime)
+    newSession.setYDoc(createYDoc(storedSession.sessionId, storedSession.content))
+    console.log('Stored session retrieved (', storedSession.user1, ',', storedSession.user2, '):', storedSession.sessionId)
+    sessions.set(storedSession.sessionId, newSession)
+    const scheduledUpdater = setInterval(async () => {
+      if (newSession.updated) {
+        const queryupdate = newSession.getUpdateDocJsonsified()
+        await dbSessions.updateOne(queryupdate[0], queryupdate[1], {upsert: false} )
+        console.log(storedSession.sessionId, 'content updated')
+      }
+    }, number.parseInt(process.env.SESSION_UPDATE || '60000'));
+    newSession.scheduledUpdater = scheduledUpdater
+  }
+});
+
+
+// HTTPS server setup
+// SSL/TLS options
+const sslOptions = {
+  key: fs.readFileSync(path.join('key.pem')),
+  cert: fs.readFileSync(path.join('cert.pem')),
+  // Recommended security settings
+  secureOptions: constants.SSL_OP_NO_SSLv3 |
+              constants.SSL_OP_NO_TLSv1 |
+              constants.SSL_OP_NO_TLSv1_1
+}
+
+const server = https.createServer(sslOptions, (req, res) => {
+  // Security headers
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  res.setHeader('X-XSS-Protection', '1; mode=block')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+
+  // Standard access to url
+  if (req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+    res.end('<h1>Welcome to the PeerPrep Collaboration Server</h1>')
+  } 
+  // POST request to create session
+  else if (req.method === 'POST' && req.url === '/api/session') {
+    // This is a POST request
+    let body = [];
+    req.on('data', (chunk) => {
+        body.push(chunk);
+    });
+    req.on('end', async () => {
+      try {
+        const jsonBody = JSON.parse(Buffer.concat(body).toString())
+        const user1 = jsonBody['user1']
+        const user2 = jsonBody['user2']
+        const session = jsonBody['sessionId']
+        const question = jsonBody['questionId']
+        const programmingLang = jsonBody['programmingLang']
+        if (!user1 || !user2 || !session || !question || !programmingLang) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'Bad request', time: new Date().toISOString() }))
+        } else {
+          const newSession = new Session(session, user1, user2, programmingLang, question, new Date())
+          
+          // Create a record in the db first with empty content
+          const ret = await dbSessions.insertOne(newSession.getJsonified());
+          
+          // Send req to question server to get parameters and function 
+
+          // Fetch default template for language from mongoDb
+
+          // Add the new YDoc with default tempalte to the session
+          newSession.setYDoc(createYDoc(session))
+          console.log('New session created (', user1, ',', user2, '):', session)
+          sessions.set(session, newSession)
+          const scheduledUpdater = setInterval(async () => {
+            if (newSession.updated) {
+              const queryupdate = newSession.getUpdateDocJsonsified()
+              await dbSessions.updateOne(queryupdate[0], queryupdate[1], {upsert: false} )
+              console.log(session, 'content updated')
+            }
+          }, number.parseInt(process.env.SESSION_UPDATE || '60000'));
+          newSession.scheduledUpdater = scheduledUpdater
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }))
+        }
+    
+      } catch (e) {
+        console.log(e)
+        if (e.code === 11000) {
+          res.writeHead(409, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'Duplicate session', time: new Date().toISOString() }))
+        } else {
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'Internal Server Error', time: new Date().toISOString() }))
+        }
+      }
+    });
+  }
+  // Unhandled requests
+  else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' })
+    res.end('404 Not Found')
+  }
 })
 
+
+
+const HOST = process.env.HOST || 'localhost'
+const PORT = number.parseInt(process.env.PORT || '1234')
+
+// Websocket server setup
+const wss = new WebSocket.Server({ noServer: true })
+
+// When websocket tries to connect
 wss.on('connection', setupWSConnection)
+
+// Function to just call when socket has some error
+function onSocketError(err) {
+  console.error(err);
+}
 
 server.on('upgrade', (request, socket, head) => {
   // You may check auth of request here..
   // Call `wss.HandleUpgrade` *after* you checked whether the client has access
   // (e.g. by checking cookies, or url parameters).
   // See https://github.com/websockets/ws#client-authentication
-  wss.handleUpgrade(request, socket, head, /** @param {any} ws */ ws => {
-    wss.emit('connection', ws, request)
-  })
+  socket.on('error', onSocketError);
+
+  const parsedURL = new URL((process.env.SERVER_URL || '') + request.url)
+  const sessionId = (parsedURL.pathname || '').slice(1)
+  const userid = parsedURL.searchParams.get('userid') || ''
+
+  if (sessions.has(sessionId) && sessions.get(sessionId)?.isValidUser(userid)) {
+    socket.removeListener('error', onSocketError);
+    wss.handleUpgrade(request, socket, head, /** @param {any} ws */ ws => {
+      wss.emit('connection', ws, request)
+      console.log(userid, 'joined', sessionId)
+    })
+  } else {
+    console.log('Unauthorized access')
+    console.log(parsedURL)
+    socket.write('HTTP/1.1 401 Unauthorized\n\n')
+    socket.destroy()
+  }
 })
 
-// server.listen(port, host, () => {
-//   console.log(`running at '${host}' on port ${port}`)
-// })
 
-server.listen(PORT, '0.0.0.0', () => {
-  // const os = require('os');
- // const interfaces = os.networkInterfaces();
-  console.log(`Yjs WebSocket server running on port ${PORT}`);
-  // console.log(`Batch interval: ${BATCH_INTERVAL}ms`);
-  console.log(`Local: ws://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  const interfaces = os.networkInterfaces()
+  console.log(`Yjs WebSocket server running on port ${PORT}`)
+  console.log(`Local: wss://localhost:${PORT}`)
   
-  // Object.keys(interfaces).forEach(ifname => {
-  //   interfaces[ifname].forEach(iface => {
-  //     if (iface.family === 'IPv4' && !iface.internal) {
-  //       console.log(`Network: ws://${iface.address}:${PORT}`);
-  //     }
-  //   });
-  // });
+  Object.keys(interfaces).forEach(ifname => {
+    interfaces[ifname].forEach(iface => {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        console.log(`Network: wss://${iface.address}:${PORT}`)
+      }
+    });
+  });
 });
-
-// process.on('SIGINT', () => {
-//   console.log('\nShutting down...');
-//   wss.close(() => {
-//     server.close(() => {
-//       console.log('Server closed');
-//       process.exit(0);
-//     });
-//   });
-// });

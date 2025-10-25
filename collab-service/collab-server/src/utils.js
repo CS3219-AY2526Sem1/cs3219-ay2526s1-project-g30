@@ -9,6 +9,7 @@ import * as map from 'lib0/map.js'
 import * as eventloop from 'lib0/eventloop.js'
 
 import { callbackHandler, isCallbackSet } from './callback.js'
+import { Session } from './session.js'
 
 const CALLBACK_DEBOUNCE_WAIT = parseInt(process.env.CALLBACK_DEBOUNCE_WAIT || '2000')
 const CALLBACK_DEBOUNCE_MAXWAIT = parseInt(process.env.CALLBACK_DEBOUNCE_MAXWAIT || '10000')
@@ -43,9 +44,9 @@ export const setPersistence = persistence_ => {
 export const getPersistence = () => persistence
 
 /**
- * @type {Map<string,WSSharedDoc>}
+ * @type {Map<string,Session>}
  */
-export const docs = new Map()
+export const sessions = new Map()
 
 const messageSync = 0
 const messageAwareness = 1
@@ -137,15 +138,37 @@ export class WSSharedDoc extends Y.Doc {
  * @param {boolean} gc - whether to allow gc on the doc (applies only when created)
  * @return {WSSharedDoc}
  */
-export const getYDoc = (docname, gc = true) => map.setIfUndefined(docs, docname, () => {
+// export const getYDoc = (docname, gc = true) => map.setIfUndefined(docs, docname, () => {
+//   const doc = new WSSharedDoc(docname)
+//   doc.gc = gc
+//   if (persistence !== null) {
+//     persistence.bindState(docname, doc)
+//   }
+//   docs.set(docname, doc)
+//   return doc
+// })
+
+/**
+ * Creates a Y.Doc
+ *
+ * @param {string} docname - the name of the Y.Doc to create
+ * @param {boolean} gc - whether to allow gc on the doc
+ * @return {WSSharedDoc}
+ */
+export const createYDoc = (docname, defaultContent = 'This is the default content', gc = true) => {
   const doc = new WSSharedDoc(docname)
-  doc.gc = gc
+  doc.gc = true
+  doc.getText('monaco').insert(0, defaultContent)
+  doc.on('afterTransaction', () => {
+    if (sessions.has(docname)) {
+      sessions.get(docname).updated = true
+    }
+  })
   if (persistence !== null) {
     persistence.bindState(docname, doc)
   }
-  docs.set(docname, doc)
   return doc
-})
+}
 
 /**
  * @param {any} conn
@@ -199,7 +222,7 @@ const closeConn = (doc, conn) => {
       persistence.writeState(doc.name, doc).then(() => {
         doc.destroy()
       })
-      docs.delete(doc.name)
+      sessions.delete(doc.name)
     }
   }
   conn.close()
@@ -229,53 +252,58 @@ const pingTimeout = 30000
  * @param {any} opts
  */
 export const setupWSConnection = (conn, req, { docName = (req.url || '').slice(1).split('?')[0], gc = true } = {}) => {
-  console.log('new connection');
   conn.binaryType = 'arraybuffer'
   // get doc, initialize if it does not exist yet
-  const doc = getYDoc(docName, gc)
-  doc.conns.set(conn, new Set())
-  // listen and reply to events
-  conn.on('message', /** @param {ArrayBuffer} message */ message => messageListener(conn, doc, new Uint8Array(message)))
+  const session = sessions.get(docName) //getYDoc(docName, gc)
+  if (!session) {
+    conn.close()
+  }
+  else {
+    const doc = session.getYDoc()
+    doc.conns.set(conn, new Set())
+      // listen and reply to events
+      conn.on('message', /** @param {ArrayBuffer} message */ message => messageListener(conn, doc, new Uint8Array(message)))
 
-  // Check if connection is still alive
-  let pongReceived = true
-  const pingInterval = setInterval(() => {
-    if (!pongReceived) {
-      if (doc.conns.has(conn)) {
-        closeConn(doc, conn)
-      }
-      clearInterval(pingInterval)
-    } else if (doc.conns.has(conn)) {
-      pongReceived = false
-      try {
-        conn.ping()
-      } catch (e) {
+      // Check if connection is still alive
+      let pongReceived = true
+      const pingInterval = setInterval(() => {
+        if (!pongReceived) {
+          if (doc.conns.has(conn)) {
+            closeConn(doc, conn)
+          }
+          clearInterval(pingInterval)
+        } else if (doc.conns.has(conn)) {
+          pongReceived = false
+          try {
+            conn.ping()
+          } catch (e) {
+            closeConn(doc, conn)
+            clearInterval(pingInterval)
+          }
+        }
+      }, pingTimeout)
+      conn.on('close', () => {
         closeConn(doc, conn)
         clearInterval(pingInterval)
+      })
+      conn.on('pong', () => {
+        pongReceived = true
+      })
+      // put the following in a variables in a block so the interval handlers don't keep in in
+      // scope
+      {
+        // send sync step 1
+        const encoder = encoding.createEncoder()
+        encoding.writeVarUint(encoder, messageSync)
+        syncProtocol.writeSyncStep1(encoder, doc)
+        send(doc, conn, encoding.toUint8Array(encoder))
+        const awarenessStates = doc.awareness.getStates()
+        if (awarenessStates.size > 0) {
+          const encoder = encoding.createEncoder()
+          encoding.writeVarUint(encoder, messageAwareness)
+          encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(doc.awareness, Array.from(awarenessStates.keys())))
+          send(doc, conn, encoding.toUint8Array(encoder))
+        }
       }
-    }
-  }, pingTimeout)
-  conn.on('close', () => {
-    closeConn(doc, conn)
-    clearInterval(pingInterval)
-  })
-  conn.on('pong', () => {
-    pongReceived = true
-  })
-  // put the following in a variables in a block so the interval handlers don't keep in in
-  // scope
-  {
-    // send sync step 1
-    const encoder = encoding.createEncoder()
-    encoding.writeVarUint(encoder, messageSync)
-    syncProtocol.writeSyncStep1(encoder, doc)
-    send(doc, conn, encoding.toUint8Array(encoder))
-    const awarenessStates = doc.awareness.getStates()
-    if (awarenessStates.size > 0) {
-      const encoder = encoding.createEncoder()
-      encoding.writeVarUint(encoder, messageAwareness)
-      encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(doc.awareness, Array.from(awarenessStates.keys())))
-      send(doc, conn, encoding.toUint8Array(encoder))
-    }
   }
 }

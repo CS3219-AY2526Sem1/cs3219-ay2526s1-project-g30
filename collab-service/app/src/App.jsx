@@ -9,8 +9,9 @@ import { MonacoBinding } from "y-monaco"
 
 function App() {
 
-  const SERVER = 'ws://192.168.1.50:1234' // Collab server address with port
-  const ROOM = 'monaco-editor-template' // SESSION ID
+  const SERVER = 'wss://192.168.1.50:1234' // Collab server address with port
+  const ROOM = 'monaco-editor-template10' // SESSION ID
+  const USERID = 'uidUser1'
   let undoManager
 
   const editorRef= useRef(null)
@@ -26,14 +27,25 @@ function App() {
       SERVER, ROOM, doc, {
         connect: true, // Connect on mount
         awarenessUpdateDelay: 0, // Disable awareness delay for immediate sync
-        maxBackoffTime: 2500, // Reconnection settings
+        maxBackoffTime: 2000, // Reconnection settings
         disableBc: false, // Disable batching for immediate updates
         // Connection parameters
         params: {
           // Add any auth params here if needed
+          userid: USERID
         }
       }
     )
+
+    provider.on('connection-close', (event) => {
+      // Websocket has been closed
+      console.log(event)
+    })
+
+    provider.on('connection-error', (event) => {
+      // Websocket has been disconnected
+      console.log(event)
+    })
     
     const type = doc.getText("monaco");
 
