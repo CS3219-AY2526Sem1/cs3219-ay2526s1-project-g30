@@ -17,6 +17,6 @@ docker run -d --name question-service -p 4000:4000 --env-file .env question-serv
 
 echo.
 echo ✅ Question Service is now running!
-echo 🌐 Access it at: http://localhost:4000/api/questions
+echo 🌐 Access it at: http://localhost:4000/questions
 echo =====================================
 pause
