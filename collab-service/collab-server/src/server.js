@@ -146,11 +146,6 @@ const server = https.createServer(sslOptions, (req, res) => {
   }
 })
 
-
-
-const HOST = process.env.HOST || 'localhost'
-const PORT = number.parseInt(process.env.PORT || '1234')
-
 // Websocket server setup
 const wss = new WebSocket.Server({ noServer: true })
 
@@ -210,8 +205,10 @@ async function endSession(session) {
   sessions.delete(session.sessionId)
 }
 
+const HOST = process.env.HOST || 'localhost'
+const PORT = number.parseInt(process.env.PORT || '1234')
 
-server.listen(PORT, HOST, () => {
+server.listen(PORT, () => {
   const interfaces = os.networkInterfaces()
   console.log(`Yjs WebSocket server running on port ${PORT}`)
   console.log(`Local: wss://localhost:${PORT}`)
