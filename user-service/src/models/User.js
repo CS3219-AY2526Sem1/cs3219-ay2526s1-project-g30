@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
   aboutMeInformation: { type: String, required: false, default: ''},
   skillLevel: { type: String, enum: ['beginner','intermediate','advanced'], default: 'beginner' },
   preferredTopics: [String],
+  questionsCompleted: { type: [String], default: []},
   profilePictureUrl: { type: String },
   isEmailVerified: { type: Boolean, default: false },
   emailVerificationToken: String,

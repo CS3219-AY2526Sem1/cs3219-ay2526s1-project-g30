@@ -14,7 +14,8 @@ const {
   forgotPassword,
   resetPassword,
   uploadProfilePicture,
-  verifyEmail
+  verifyEmail,
+  addCompletedQuestion,
 } = require('../controllers/userController');
 
 const storage = multer.diskStorage({
@@ -41,5 +42,6 @@ router.put('/profile', protect, updateUserProfile);
 router.delete('/profile', protect, deleteUserProfile);
 router.put('/change-password', protect, changePassword);
 router.put('/profile/picture', protect, upload.single('profilePicture'), uploadProfilePicture);
+router.post('/profile/questions-completed', protect, addCompletedQuestion);
 
 module.exports = router;

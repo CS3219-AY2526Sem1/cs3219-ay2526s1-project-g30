@@ -9,4 +9,5 @@ module.exports = {
   resetPassword: require('./resetPassword'),
   uploadProfilePicture: require('./uploadProfilePicture'),
   verifyEmail: require('./verifyEmail'),
-};
+  addCompletedQuestion: require('./addCompletedQuestion'),
+}; 
