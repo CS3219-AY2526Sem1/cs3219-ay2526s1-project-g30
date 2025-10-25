@@ -19,6 +19,15 @@ const {
 
 const storage = multer.memoryStorage();
 
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image')) {
+    cb(null, true); // Accept the file
+  } else {
+    // Reject the file and provide an error message
+    cb(new Error('Invalid file type. Only images are allowed.'), false);
+  }
+};
+
 const upload = multer({ storage: storage, fileFilter: fileFilter });
 
 // Public Routes

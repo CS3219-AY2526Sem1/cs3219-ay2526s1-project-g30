@@ -3,7 +3,7 @@ const { Storage } = require('@google-cloud/storage');
 const path = require('path');
 
 const storage = new Storage();
-const bucketName = 'your-gcs-bucket-name';
+const bucketName = 'peerprep-user-service';
 const bucket = storage.bucket(bucketName);
 
 const uploadProfilePicture = async (req, res) => {
@@ -33,7 +33,7 @@ const uploadProfilePicture = async (req, res) => {
 
     blobStream.on('finish', async () => {
       // Construct the public URL (ensure your bucket has public access configured)
-      const publicUrl = `https://storage.googleapis.com/${peerprep-user-service}/${blobName}`;
+      const publicUrl = `https://storage.googleapis.com/${bucketName}/${blobName}`;
 
       // Update the user's profilePictureUrl in the database
       user.profilePictureUrl = publicUrl;
