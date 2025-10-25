@@ -59,8 +59,8 @@ MongoClient.connect(mongoOnlineUrl)
 // HTTPS server setup
 // SSL/TLS options
 const sslOptions = {
-  key: fs.readFileSync(path.join('key.pem')),
-  cert: fs.readFileSync(path.join('cert.pem')),
+  key: process.env.KEY, //fs.readFileSync(path.join('key.pem')),
+  cert: process.env.CERT, //fs.readFileSync(path.join('cert.pem')),
   // Recommended security settings
   secureOptions: constants.SSL_OP_NO_SSLv3 |
               constants.SSL_OP_NO_TLSv1 |
