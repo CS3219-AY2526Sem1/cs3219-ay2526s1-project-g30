@@ -157,7 +157,7 @@ export class WSSharedDoc extends Y.Doc {
  */
 export const createYDoc = (docname, defaultContent = 'This is the default content', gc = true) => {
   const doc = new WSSharedDoc(docname)
-  doc.gc = true
+  doc.gc = gc
   doc.getText('monaco').insert(0, defaultContent)
   doc.on('afterTransaction', () => {
     const session = sessions.get(docname)
