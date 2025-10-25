@@ -1,5 +1,7 @@
 /collaboration-service/.env
 /collaboration-service/.vscode
 *.un~
+/node_modules
+**/.*env
 .vscode/
 .DS_Store
