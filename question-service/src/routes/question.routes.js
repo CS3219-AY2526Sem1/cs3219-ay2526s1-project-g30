@@ -1,5 +1,6 @@
 import express from 'express';
 import Question from '../models/question.model.js';
+import {generateFunctionTemplate} from "../utils/generateSignature.js";
 
 const router = express.Router();
 
@@ -39,16 +40,48 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+// get the function signature and definitions
+router.get('/:id/template', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { lang } = req.query;
+
+        if (!['python', 'java', 'cpp'].includes(lang)) {
+            return res.status(400).json({ message: 'Unsupported language' });
+        }
+
+        const question = await Question.findById(id);
+        if (!question) return res.status(404).json({ message: 'Question not found' });
+
+        const template = generateFunctionTemplate(question, lang);
+        res.json(template);
+
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 // add a single question
 router.post('/', async (req, res) => {
     try {
-        const {title, description, difficulty, category, examples, function_name, function_params} = req.body;
+        const {title, description, difficulty, category, examples, function_name, function_params, function_return} = req.body;
 
         if (!title || !difficulty) {
             return res.status(400).json({message: 'Title and difficulty are required.'});
         }
+        if (!function_name) {
+            return res.status(400).json({message: 'Function name is required.'});
+        }
         if (!function_params) {
             return res.status(400).json({message: 'Function parameters are required.'});
+        }
+        if (!function_return) {
+            return res.status(400).json({message: 'Return type of function required.'});
+        }
+        if (!Array.isArray(function_params) || function_params.some(p =>
+            !p.name || !p.langType || !p.langType.python || !p.langType.java || !p.langType.cpp
+        )) {
+            return res.status(400).json({ message: 'Each function parameter must have name and langType for python/java/cpp.' });
         }
 
         const newQuestion = new Question({
@@ -58,7 +91,8 @@ router.post('/', async (req, res) => {
             category,
             examples,
             function_name,
-            function_params
+            function_params,
+            function_return
         });
 
         const savedQuestion = await newQuestion.save();
