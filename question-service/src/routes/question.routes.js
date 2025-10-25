@@ -69,7 +69,7 @@ router.post('/', async (req, res) => {
 });
 
 // edit a single question by ID
-router.post('/edit/:id', async (req, res) => {
+router.patch('/edit/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
