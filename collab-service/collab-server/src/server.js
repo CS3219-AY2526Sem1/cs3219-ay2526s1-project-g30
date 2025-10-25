@@ -42,13 +42,15 @@ MongoClient.connect(mongoOnlineUrl)
     newSession.setYDoc(createYDoc(storedSession.sessionId, storedSession.content))
     console.log('Stored session retrieved (', storedSession.user1, ',', storedSession.user2, '):', storedSession.sessionId)
     sessions.set(storedSession.sessionId, newSession)
+    const sessionTimeout = setTimeout(() => endSession(newSession), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
     const scheduledUpdater = setInterval(async () => {
       if (newSession.updated) {
+        sessionTimeout.refresh()
         const queryupdate = newSession.getUpdateDocJsonsified()
         await dbSessions.updateOne(queryupdate[0], queryupdate[1], {upsert: false} )
         console.log(storedSession.sessionId, 'content updated')
       }
-    }, number.parseInt(process.env.SESSION_UPDATE || '60000'));
+    }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
     newSession.scheduledUpdater = scheduledUpdater
   }
 });
@@ -110,13 +112,16 @@ const server = https.createServer(sslOptions, (req, res) => {
           newSession.setYDoc(createYDoc(session))
           console.log('New session created (', user1, ',', user2, '):', session)
           sessions.set(session, newSession)
+          const sessionTimeout = setTimeout(() => endSession(newSession), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
           const scheduledUpdater = setInterval(async () => {
             if (newSession.updated) {
+              sessionTimeout.refresh()
               const queryupdate = newSession.getUpdateDocJsonsified()
               await dbSessions.updateOne(queryupdate[0], queryupdate[1], {upsert: false} )
               console.log(session, 'content updated')
             }
           }, number.parseInt(process.env.SESSION_UPDATE || '60000'));
+          
           newSession.scheduledUpdater = scheduledUpdater
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }))
@@ -178,9 +183,32 @@ server.on('upgrade', (request, socket, head) => {
     console.log('Unauthorized access')
     console.log(parsedURL)
     socket.write('HTTP/1.1 401 Unauthorized\n\n')
+    socket.emit('close')
     socket.destroy()
   }
 })
+
+// End a session
+// Sends PUT requests to User service to update questions completed
+// Marks the session as inactive and destroys relevant data 
+async function endSession(session) {
+  console.log('Ending session:', session.sessionId)
+  session.endSession()
+  // Send PUT Request to User service
+
+  // Mark the session as inactive in MongoDB
+  await dbSessions.updateOne(
+    { sessionId: session.sessionId },
+    { $set: { 
+          status: session.status, 
+          updatedAt: new Date() 
+      } },
+    {upsert: false}
+  )
+  
+  // remove Session from Sessions map
+  sessions.delete(session.sessionId)
+}
 
 
 server.listen(PORT, HOST, () => {

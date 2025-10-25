@@ -1,3 +1,5 @@
+import { closeAllConn } from './utils.js'
+
 export class Session {
     constructor(sessionId, userId1, userId2, language, question, start) {
         this.sessionId = sessionId;
@@ -57,5 +59,12 @@ export class Session {
         }
         this.updated = false
         return [query, update]
+    }
+
+    endSession() {
+        closeAllConn(this.yDoc, 3000, 'Session has ended due to inactivity')
+        this.yDoc.destroy()
+        clearInterval(this.scheduledUpdater)
+        this.status = 'Inactive'
     }
 }

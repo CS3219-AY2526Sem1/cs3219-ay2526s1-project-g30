@@ -10,7 +10,7 @@ import { MonacoBinding } from "y-monaco"
 function App() {
 
   const SERVER = 'wss://192.168.1.50:1234' // Collab server address with port
-  const ROOM = 'monaco-editor-template10' // SESSION ID
+  const ROOM = 'monaco-editor-template14' // SESSION ID
   const USERID = 'uidUser1'
   let undoManager
 
@@ -36,15 +36,18 @@ function App() {
         }
       }
     )
-
-    provider.on('connection-close', (event) => {
-      // Websocket has been closed
+    provider.ws.addEventListener('close', event => {
+      console.log("ws close listener hit")
       console.log(event)
-    })
-
-    provider.on('connection-error', (event) => {
-      // Websocket has been disconnected
-      console.log(event)
+      console.log(event.code)
+      if (event.code === 1006) {
+        alert("Could not establish connection to server")
+      } if (event.code === 3000) {
+        alert(event.reason)
+      } else {
+        console.log("uncaught close code")
+      }
+      provider.disconnect()
     })
     
     const type = doc.getText("monaco");
@@ -112,10 +115,7 @@ function App() {
         undoManager.redo()
       }
     })
-
-
     console.log(provider.awareness);
-
   }
 
   return (

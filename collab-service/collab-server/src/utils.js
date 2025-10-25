@@ -208,7 +208,7 @@ const messageListener = (conn, doc, message) => {
  * @param {WSSharedDoc} doc
  * @param {any} conn
  */
-const closeConn = (doc, conn) => {
+const closeConn = (doc, conn, code = 4000, remarks = 'Unexpected closure') => {
   if (doc.conns.has(conn)) {
     /**
      * @type {Set<number>}
@@ -217,15 +217,19 @@ const closeConn = (doc, conn) => {
     const controlledIds = doc.conns.get(conn)
     doc.conns.delete(conn)
     awarenessProtocol.removeAwarenessStates(doc.awareness, Array.from(controlledIds), null)
-    if (doc.conns.size === 0 && persistence !== null) {
-      // if persisted, we store state and destroy ydocument
-      persistence.writeState(doc.name, doc).then(() => {
-        doc.destroy()
-      })
-      sessions.delete(doc.name)
-    }
   }
-  conn.close()
+  console.log('Closing websocket with', code, remarks)
+  conn.close(code, remarks)
+}
+
+/**
+ * @param {WSSharedDoc} doc
+ */
+export const closeAllConn = (doc, code = 4000, remarks = 'Unexpected closure') => {
+  for (const conn of doc.conns.keys()) {
+    console.log(conn)
+    closeConn(doc, conn, code, remarks)
+  }
 }
 
 /**
@@ -235,12 +239,13 @@ const closeConn = (doc, conn) => {
  */
 const send = (doc, conn, m) => {
   if (conn.readyState !== wsReadyStateConnecting && conn.readyState !== wsReadyStateOpen) {
-    closeConn(doc, conn)
+    closeConn(doc, conn, 4005, "Connection not available")
   }
   try {
-    conn.send(m, {}, err => { err != null && closeConn(doc, conn) })
+    conn.send(m, {}, err => { err != null && closeConn(doc, conn, 4003, err.message) })
   } catch (e) {
-    closeConn(doc, conn)
+    console.log(e)
+    closeConn(doc, conn, 4004, "Error occurred")
   }
 }
 
@@ -255,55 +260,51 @@ export const setupWSConnection = (conn, req, { docName = (req.url || '').slice(1
   conn.binaryType = 'arraybuffer'
   // get doc, initialize if it does not exist yet
   const session = sessions.get(docName) //getYDoc(docName, gc)
-  if (!session) {
-    conn.close()
-  }
-  else {
-    const doc = session.getYDoc()
-    doc.conns.set(conn, new Set())
-      // listen and reply to events
-      conn.on('message', /** @param {ArrayBuffer} message */ message => messageListener(conn, doc, new Uint8Array(message)))
+  const doc = session.getYDoc()
+  doc.conns.set(conn, new Set())
+  // listen and reply to events
+  conn.on('message', /** @param {ArrayBuffer} message */ message => messageListener(conn, doc, new Uint8Array(message)))
 
-      // Check if connection is still alive
-      let pongReceived = true
-      const pingInterval = setInterval(() => {
-        if (!pongReceived) {
-          if (doc.conns.has(conn)) {
-            closeConn(doc, conn)
-          }
-          clearInterval(pingInterval)
-        } else if (doc.conns.has(conn)) {
-          pongReceived = false
-          try {
-            conn.ping()
-          } catch (e) {
-            closeConn(doc, conn)
-            clearInterval(pingInterval)
-          }
-        }
-      }, pingTimeout)
-      conn.on('close', () => {
-        closeConn(doc, conn)
-        clearInterval(pingInterval)
-      })
-      conn.on('pong', () => {
-        pongReceived = true
-      })
-      // put the following in a variables in a block so the interval handlers don't keep in in
-      // scope
-      {
-        // send sync step 1
-        const encoder = encoding.createEncoder()
-        encoding.writeVarUint(encoder, messageSync)
-        syncProtocol.writeSyncStep1(encoder, doc)
-        send(doc, conn, encoding.toUint8Array(encoder))
-        const awarenessStates = doc.awareness.getStates()
-        if (awarenessStates.size > 0) {
-          const encoder = encoding.createEncoder()
-          encoding.writeVarUint(encoder, messageAwareness)
-          encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(doc.awareness, Array.from(awarenessStates.keys())))
-          send(doc, conn, encoding.toUint8Array(encoder))
-        }
+  // Check if connection is still alive
+  let pongReceived = true
+  const pingInterval = setInterval(() => {
+    if (!pongReceived) {
+      if (doc.conns.has(conn)) {
+        closeConn(doc, conn, 4002, 'Check-alive failed')
       }
+      clearInterval(pingInterval)
+    } else if (doc.conns.has(conn)) {
+      pongReceived = false
+      try {
+        conn.ping()
+      } catch (e) {
+        closeConn(doc, conn, 4002, 'Check-alive failed')
+        clearInterval(pingInterval)
+      }
+    }
+  }, pingTimeout)
+  conn.on('close', () => {
+    //closeConn(doc, conn, 4001, 'Closed due to unknown reasons')
+    clearInterval(pingInterval)
+  })
+  conn.on('pong', () => {
+    pongReceived = true
+  })
+  // put the following in a variables in a block so the interval handlers don't keep in in
+  // scope
+  {
+    // send sync step 1
+    const encoder = encoding.createEncoder()
+    encoding.writeVarUint(encoder, messageSync)
+    syncProtocol.writeSyncStep1(encoder, doc)
+    send(doc, conn, encoding.toUint8Array(encoder))
+    const awarenessStates = doc.awareness.getStates()
+    if (awarenessStates.size > 0) {
+      const encoder = encoding.createEncoder()
+      encoding.writeVarUint(encoder, messageAwareness)
+      encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(doc.awareness, Array.from(awarenessStates.keys())))
+      send(doc, conn, encoding.toUint8Array(encoder))
+    }
   }
+
 }
