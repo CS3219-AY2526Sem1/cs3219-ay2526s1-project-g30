@@ -1,3 +1,5 @@
 /collaboration-service/.env
 /collaboration-service/.vscode
 *.un~
+.vscode/
+.DS_Store
