@@ -1,4 +1,5 @@
 *.un~
+.idea/
 /node_modules
 **/.*env
 .vscode/
