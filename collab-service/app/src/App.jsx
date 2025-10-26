@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useState, useRef } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import Editor from "@monaco-editor/react"
@@ -16,6 +16,8 @@ function App() {
   let undoManager
 
   const editorRef= useRef(null)
+  const containerRef = useRef(null)
+  const [remoteCursors, setRemoteCursors] = useState({})
 
   function handleEditorDidMount(editor, monaco) {
     editorRef.current = editor;
@@ -58,13 +60,25 @@ function App() {
     // Trying to put Presence of other user
     
     const awareness = provider.awareness
+
+    const userName = 'User_' + Math.floor(Math.random() * 1000)
+    const userColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')
+    
+    awareness.setLocalStateField('user', {
+      name: userName,
+      color: userColor
+    })
+
+    console.log('🟢 You are:', userName, userColor)
+
     // You can observe when a user updates their awareness information
+    /*
     awareness.on('change', changes => {
       // Whenever somebody updates their awareness information,
       // we log all awareness information from all users.
       console.log(Array.from(awareness.getStates().values()))
     })
-    /*
+    
     awareness.setLocalStateField('user', {
       // Define a print name that should be displayed
       name: 'Emmanuelle Charpentier',
@@ -123,16 +137,172 @@ function App() {
       }
     })
     console.log(provider.awareness);
+
+    // Send cursor position to other users
+    function updateLocalCursor() {
+      const position = editor.getPosition()
+      const selection = editor.getSelection()
+      
+      if (!position) return
+      
+      awareness.setLocalStateField('cursor', {
+        position: { lineNumber: position.lineNumber, column: position.column },
+        selection: selection ? {
+          startLineNumber: selection.startLineNumber,
+          startColumn: selection.startColumn,
+          endLineNumber: selection.endLineNumber,
+          endColumn: selection.endColumn
+        } : null,
+        timestamp: Date.now()
+      })
+    }
+
+    editor.onDidChangeCursorPosition(updateLocalCursor)
+    editor.onDidChangeCursorSelection(updateLocalCursor)
+
+    // Render remote cursors as HTML overlays
+    function renderRemoteCursorsAsHTML() {
+      const states = awareness.getStates()
+      const localClientId = awareness.clientID
+      const model = editor.getModel()
+      
+      if (!model) return
+
+      const cursors = {}
+      
+      states.forEach((state, clientId) => {
+        if (clientId === localClientId) return
+        
+        const user = state.user
+        const cursor = state.cursor
+        
+        if (!user || !cursor || !cursor.position) return
+        
+        const { lineNumber, column } = cursor.position
+        
+        // Get pixel coordinates for the cursor position
+        try {
+          const coords = editor.getScrolledVisiblePosition({
+            lineNumber: lineNumber,
+            column: column
+          })
+          
+          if (coords) {
+            cursors[clientId] = {
+              name: user.name,
+              color: user.color,
+              top: coords.top,
+              left: coords.left,
+              visible: true
+            }
+            
+            console.log(`👤 ${user.name} cursor at line ${lineNumber}:${column} (${coords.left}px, ${coords.top}px)`)
+          }
+        } catch (error) {
+          console.error('Error getting cursor position:', error)
+        }
+      })
+      
+      setRemoteCursors(cursors)
+    }
+
+    // Update cursors on awareness changes
+    awareness.on('change', () => {
+      console.log('🔄 Awareness changed, users:', awareness.getStates().size)
+      renderRemoteCursorsAsHTML()
+    })
+
+    // Update cursors on scroll or content changes
+    editor.onDidScrollChange(() => renderRemoteCursorsAsHTML())
+    editor.onDidChangeModelContent(() => {
+      setTimeout(renderRemoteCursorsAsHTML, 10)
+    })
+
+    // Initial render
+    setTimeout(() => {
+      renderRemoteCursorsAsHTML()
+      updateLocalCursor()
+    }, 10)
   }
 
   return (
-    <Editor
-      height="100vh"
-      width="100vw"
-      theme="vs-dark"
-      onMount={handleEditorDidMount}
-      defaultLanguage='python'
-    />
+    <div ref={containerRef} style={{ position: 'relative', width: '100vw', height: '100vh' }}>
+      <Editor
+        height="100%"
+        width="100%"
+        theme="vs-dark"
+        onMount={handleEditorDidMount}
+        defaultLanguage='python'
+        options={{
+          automaticLayout: true,
+          minimap: { enabled: false },
+          wordWrap: 'on'
+        }}
+      />
+      
+      {/* Render remote cursors as HTML overlays */}
+      {Object.entries(remoteCursors).map(([clientId, cursor]) => (
+        cursor.visible && (
+          <div
+            key={clientId}
+            style={{
+              position: 'absolute',
+              left: `${cursor.left}px`,
+              top: `${cursor.top}px`,
+              pointerEvents: 'none',
+              zIndex: 1000,
+              transition: 'all 0.1s ease-out'
+            }}
+          >
+            {/* Cursor line */}
+            <div
+              style={{
+                width: '2px',
+                height: '20px',
+                backgroundColor: cursor.color,
+                position: 'relative'
+              }}
+            />
+            
+            {/* Cursor label */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '-22px',
+                left: '0',
+                backgroundColor: cursor.color,
+                color: 'white',
+                padding: '2px 6px',
+                borderRadius: '3px',
+                fontSize: '11px',
+                fontFamily: 'sans-serif',
+                whiteSpace: 'nowrap',
+                fontWeight: '500'
+              }}
+            >
+              {cursor.name}
+            </div>
+          </div>
+        )
+      ))}
+      
+      {/* Debug panel */}
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        background: 'rgba(0,0,0,0.8)',
+        color: 'white',
+        padding: '10px',
+        borderRadius: '4px',
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        zIndex: 10000
+      }}>
+        <div>Connected users: {Object.keys(remoteCursors).length + 1}</div>
+        <div>Remote cursors visible: {Object.values(remoteCursors).filter(c => c.visible).length}</div>
+      </div>
+    </div>
   )
 }
 
