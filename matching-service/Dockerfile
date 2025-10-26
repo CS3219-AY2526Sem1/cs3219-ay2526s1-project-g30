@@ -9,6 +9,7 @@ COPY *.go ./
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-w -s' -o /app/server .
 
 FROM alpine:latest
+RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
 
