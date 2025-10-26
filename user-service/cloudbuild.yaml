@@ -4,7 +4,9 @@ steps:
       - 'build'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/user-service:latest'
-      - '.' 
+      - '-f'
+      - 'user-service/Dockerfile'
+      - 'user-service/'
     timeout: '1200s'
 
   - name: 'gcr.io/cloud-builders/docker'
@@ -16,7 +18,7 @@ images:
   - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/user-service:latest'
 
 options:
-  logging: CLOUD_LOGGING_ONLY 
+  logging: CLOUD_LOGGING_ONLY
 
 substitutions:
   _REGION: asia-southeast1
