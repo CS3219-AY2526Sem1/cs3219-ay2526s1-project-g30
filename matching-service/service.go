@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -28,9 +29,18 @@ func NewMatchingService(matcher Matcher) *MatchingService {
 	}
 }
 
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
 func getQuestionFromService(difficulty string, topic string, user1ID string, user2ID string) (string, error) {
-	// FIXME: using the actual api url
-	url := fmt.Sprintf("http://localhost:8081/api/v1/questions/random?difficulty=%s&topic=%s&user1=%s&user2=%s", difficulty, topic, user1ID, user2ID)
+	// HACK: temply change api fmt for ques compatibility
+	baseURL := getEnv("QUESTION_SERVICE_URL", "http://localhost:8081")
+	// url := fmt.Sprintf("%s/api/v1/questions/random?difficulty=%s&topic=%s&user1=%s&user2=%s", baseURL, difficulty, topic, user1ID, user2ID)
+	url := fmt.Sprintf("%s/questions/randomQuestion?difficulty=%s&topic=%s&user1=%s&user2=%s", baseURL, difficulty, topic, user1ID, user2ID)
 
 	log.Info().Str("url", url).Msg("Requesting question from Question Service...")
 
@@ -56,8 +66,11 @@ func getQuestionFromService(difficulty string, topic string, user1ID string, use
 }
 
 func informCollaborationService(payload CollaborationRequest) error {
-	// FIXME: using the actual api url
-	url := "http://localhost:8082/api/v1/sessions"
+	baseURL := getEnv("COLLAB_SERVICE_URL", "http://localhost:8082")
+	// HACK: temply rm `v1` for collab compatibility
+	// url := fmt.Sprintf("%s/api/v1/sessions", baseURL)
+	url := fmt.Sprintf("%s/api/session", baseURL)
+	
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to marshal request for Collaboration Service")
