@@ -157,7 +157,7 @@ export class WSSharedDoc extends Y.Doc {
  */
 export const createYDoc = (docname, defaultContent = 'This is the default content', gc = true) => {
   const doc = new WSSharedDoc(docname)
-  doc.gc = true
+  doc.gc = gc
   doc.getText('monaco').insert(0, defaultContent)
   doc.on('afterTransaction', () => {
     const session = sessions.get(docname)
@@ -295,7 +295,7 @@ export const setupWSConnection = (conn, req, { docName = (req.url || '').slice(1
   conn.on('pong', () => {
     pongReceived = true
   })
-  // put the following in a variables in a block so the interval handlers don't keep in in
+  // put the following in a variables in a block so the interval handlers don't keep it in
   // scope
   {
     // send sync step 1

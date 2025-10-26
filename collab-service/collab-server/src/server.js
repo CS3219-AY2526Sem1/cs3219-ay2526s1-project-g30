@@ -114,7 +114,9 @@ const server = http.createServer((req, res) => {
           const newSession = new Session(session, user1, user2, programmingLang, question, new Date())
           
           // Check valid user and question
+          // Send req to question server to get parameters and function 
           const questionPromise = fetchQuestion(question, programmingLang)
+          // Fetch default template for language from mongoDb
           const templatePromise = dbTemplates.findOne({ programmingLanguage: programmingLang })
           const [questionResult, templateResult] = await Promise.all([questionPromise, templatePromise]);
           if (!questionResult.signature || !templateResult.template) {
@@ -125,12 +127,9 @@ const server = http.createServer((req, res) => {
           // Create a record in the db first with empty content
           const ret = await dbSessions.insertOne(newSession.getJsonified())
           
-          // Send req to question server to get parameters and function 
-
-          // Fetch default template for language from mongoDb
-
           // Add the new YDoc with default template to the session
           newSession.setYDoc(createYDoc(session, defaultContent))
+
           console.log('New session created (', user1, ',', user2, '):', session)
           sessions.set(session, newSession)
           
