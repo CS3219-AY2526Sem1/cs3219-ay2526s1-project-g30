@@ -23,6 +23,6 @@ func main() {
 	router := gin.Default()
 	router.POST("/api/v1/match", createMatchHandler(service))
 
-	log.Info().Msg("Matching service started successfully. Listening on localhost:8080...")
-	router.Run("localhost:8080")
+	log.Info().Msg("Matching service started successfully. Listening on 0.0.0.0:8080...")
+	router.Run("0.0.0.0:8080")
 }
