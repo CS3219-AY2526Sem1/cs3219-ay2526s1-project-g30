@@ -13,6 +13,7 @@ export class Session {
         this.status = 'Active'
         this.updated = true
         this.scheduledUpdater = null // To be destroyed when session is destroyed
+        this.sessionTimeout = null
     }
 
     isValidUser(user) {
@@ -61,10 +62,11 @@ export class Session {
         return [query, update]
     }
 
-    endSession() {
-        closeAllConn(this.yDoc, 3000, 'Session has ended due to inactivity')
+    endSession(reason) {
+        closeAllConn(this.yDoc, 3000, reason)
         this.yDoc.destroy()
         clearInterval(this.scheduledUpdater)
+        clearTimeout(this.sessionTimeout)
         this.status = 'Inactive'
     }
 }

@@ -2,7 +2,7 @@
 import dotenv from 'dotenv'
 import WebSocket from 'ws'
 import http from 'http'
-import https from 'http'
+import https from 'https'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -54,7 +54,7 @@ MongoClient.connect(mongoOnlineUrl, {
     newSession.setYDoc(createYDoc(storedSession.sessionId, storedSession.content))
     console.log('Stored session retrieved (', storedSession.user1, ',', storedSession.user2, '):', storedSession.sessionId)
     sessions.set(storedSession.sessionId, newSession)
-    const sessionTimeout = setTimeout(() => endSession(newSession), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
+    const sessionTimeout = setTimeout(() => endSession(newSession, "Session has ended due to inactivity"), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
     const scheduledUpdater = setInterval(async () => {
       if (newSession.updated) {
         sessionTimeout.refresh()
@@ -64,28 +64,29 @@ MongoClient.connect(mongoOnlineUrl, {
       }
     }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
     newSession.scheduledUpdater = scheduledUpdater
+    newSession.sessionTimeout = sessionTimeout
   }
 })
 
 
 // HTTP server setup
 // SSL/TLS options
-// const sslOptions = {
-//   key: process.env.KEY, //fs.readFileSync(path.join('key.pem')),
-//   cert: process.env.CERT, //fs.readFileSync(path.join('cert.pem')),
-//   // Recommended security settings
-//   secureOptions: constants.SSL_OP_NO_SSLv3 |
-//               constants.SSL_OP_NO_TLSv1 |
-//               constants.SSL_OP_NO_TLSv1_1
-// }
+const sslOptions = {
+  key: process.env.KEY, //fs.readFileSync(path.join('key.pem')),
+  cert: process.env.CERT, //fs.readFileSync(path.join('cert.pem')),
+  // Recommended security settings
+  secureOptions: constants.SSL_OP_NO_SSLv3 |
+              constants.SSL_OP_NO_TLSv1 |
+              constants.SSL_OP_NO_TLSv1_1
+}
 
-const server = http.createServer((req, res) => {
+const server = https.createServer(sslOptions, (req, res) => {
   // Security headers
-  // res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
-  // res.setHeader('X-Content-Type-Options', 'nosniff')
-  // res.setHeader('X-Frame-Options', 'SAMEORIGIN')
-  // res.setHeader('X-XSS-Protection', '1; mode=block')
-  // res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+  res.setHeader('X-XSS-Protection', '1; mode=block')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
 
   // Standard access to url
   if (req.url === '/') {
@@ -101,6 +102,12 @@ const server = http.createServer((req, res) => {
     })
     req.on('end', async () => {
       try {
+        if (!dbSessions) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          if (!dbSessions) {
+            throw new Error("DB has not been connected")
+          }
+        }
         const jsonBody = JSON.parse(Buffer.concat(body).toString())
         const user1 = jsonBody['user1']
         const user2 = jsonBody['user2']
@@ -114,16 +121,19 @@ const server = http.createServer((req, res) => {
           const newSession = new Session(session, user1, user2, programmingLang, question, new Date())
           
           // Check valid user and question
+          const valU1Promise = validateUser(user1)
+          const valU2Promise = validateUser(user2)
           // Send req to question server to get parameters and function 
           const questionPromise = fetchQuestion(question, programmingLang)
           // Fetch default template for language from mongoDb
           const templatePromise = dbTemplates.findOne({ programmingLanguage: programmingLang })
-          const [questionResult, templateResult] = await Promise.all([questionPromise, templatePromise]);
-          if (!questionResult.signature || !templateResult.template) {
+          const [questionResult, templateResult, validUser1, validUser2] = await Promise.all([questionPromise, templatePromise, valU1Promise, valU2Promise]);
+          if (!questionResult.signature || !templateResult.template || !validUser1 || !validUser2) {
             throw new Error("Invalid parameters")
           }
-          const defaultContent = questionResult.definitions + '\n\n\n' + templateResult.template.replace('<template function to go here>', questionResult.signature)
 
+          const defaultContent = questionResult.definitions + '\n\n\n' + templateResult.template.replace('<template function to go here>', questionResult.signature)
+          
           // Create a record in the db first with empty content
           const ret = await dbSessions.insertOne(newSession.getJsonified())
           
@@ -134,7 +144,7 @@ const server = http.createServer((req, res) => {
           sessions.set(session, newSession)
           
           // Add session timeout and scheduled updater for db
-          const sessionTimeout = setTimeout(() => endSession(newSession), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
+          const sessionTimeout = setTimeout(() => endSession(newSession, "Session has ended due to inactivity"), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
           const scheduledUpdater = setInterval(async () => {
             if (newSession.updated) {
               sessionTimeout.refresh()
@@ -144,13 +154,61 @@ const server = http.createServer((req, res) => {
             }
           }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
           newSession.scheduledUpdater = scheduledUpdater
+          newSession.sessionTimeout = sessionTimeout
           
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }))
         }
-    
       } catch (e) {
-        console.log(e)
+        console.error(e)
+        if (e instanceof MongoError && e.code === 11000) {
+          res.writeHead(409, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'Duplicate session', time: new Date().toISOString() }))
+        } else if (e instanceof Error && e.message === "Invalid parameters") {
+          res.writeHead(409, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'Invalid parameters', time: new Date().toISOString() }))
+        } else {
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'Internal Server Error', time: new Date().toISOString() }))
+        }
+      }
+    })
+  } else if (req.method === 'POST' && req.url === '/api/terminate') {
+    let body = []
+    req.on('data', (chunk) => {
+        body.push(chunk)
+    })
+    req.on('end', async () => {
+      try {
+        if (!dbSessions) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          if (!dbSessions) {
+            throw new Error("DB has not been connected")
+          }
+        }
+        const jsonBody = JSON.parse(Buffer.concat(body).toString())
+        const user = jsonBody['user']
+        const sessionId = jsonBody['sessionId']
+        if (!user || !sessionId) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'Bad request', time: new Date().toISOString() }))
+        } else {
+          
+          // Check if valid user and valid user for session
+          validateUser(user)
+          if (!sessions.has(sessionId) || !sessions.get(sessionId)?.isValidUser(user)) {
+            throw new Error('Invalid parameters')
+          }
+          const successfullyEnded = await endSession(sessions.get(sessionId), "User has ended session")
+          if (successfullyEnded) {
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }))
+          } else {
+            throw new Error('Failed to end session: ' + sessionId)
+          }
+        }
+      } catch (e) {
+        console.error(e)
         if (e instanceof MongoError && e.code === 11000) {
           res.writeHead(409, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ status: 'Duplicate session', time: new Date().toISOString() }))
@@ -211,23 +269,31 @@ server.on('upgrade', (request, socket, head) => {
 // End a session
 // Sends PUT requests to User service to update questions completed
 // Marks the session as inactive and destroys relevant data 
-async function endSession(session) {
+async function endSession(session, reason) {
   console.log('Ending session:', session.sessionId)
-  session.endSession()
-  // Send PUT Request to User service
+  try {
+    session.endSession(reason)
+    // Send PUT Request to User service
 
-  // Mark the session as inactive in MongoDB
-  await dbSessions.updateOne(
-    { sessionId: session.sessionId },
-    { $set: { 
-          status: session.status, 
-          updatedAt: new Date() 
-      } },
-    {upsert: false}
-  )
-  
-  // remove Session from Sessions map
-  sessions.delete(session.sessionId)
+    // Mark the session as inactive in MongoDB
+    await dbSessions.updateOne(
+      { sessionId: session.sessionId },
+      { $set: { 
+            status: session.status, 
+            updatedAt: new Date() 
+        } },
+      {upsert: false}
+    )
+    
+    // remove Session from Sessions map
+    sessions.delete(session.sessionId)
+    console.log('Successfully ended session:', session.sessionId)
+    return true
+  } catch (e) {
+    console.log('Failed to end session:', session.sessionId)
+    console.error(e)
+    return false
+  }
 }
 
 async function validateUser(userId) {
@@ -237,8 +303,11 @@ async function validateUser(userId) {
       'Content-Type': 'application/json',
     }
   });
-  const data = await response.json();
-  return data
+  console.log(response)
+  const data = await response //response.json();
+  console.log(data)
+  // Check datas to see if valid
+  return true
 }
 
 async function fetchQuestion(questionId, language) {
@@ -248,7 +317,9 @@ async function fetchQuestion(questionId, language) {
       'Content-Type': 'application/json',
     }
   });
+  
   const data = await response.json();
+  console.log(data)
   return data
 }
 
