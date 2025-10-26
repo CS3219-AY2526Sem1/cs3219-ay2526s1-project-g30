@@ -303,9 +303,9 @@ async function validateUser(userId) {
       'Content-Type': 'application/json',
     }
   });
-  console.log(response)
+  // console.log(response)
   const data = await response //response.json();
-  console.log(data)
+  // console.log(data)
   // Check datas to see if valid
   return true
 }
@@ -319,7 +319,7 @@ async function fetchQuestion(questionId, language) {
   });
   
   const data = await response.json();
-  console.log(data)
+  // console.log(data)
   return data
 }
 
