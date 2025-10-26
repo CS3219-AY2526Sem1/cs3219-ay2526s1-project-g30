@@ -2,6 +2,7 @@
 import dotenv from 'dotenv'
 import WebSocket from 'ws'
 import http from 'http'
+import https from 'http'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -14,6 +15,9 @@ import { MongoClient, MongoError } from 'mongodb'
 // .env file config
 dotenv.config()
 
+// Other service set up
+const questionService = process.env.QUESTION_SERVICE
+const userService = process.env.USER_SERVICE
 
 // MongoDB setup
 // const mongoLocalUrl = 'mongodb://localhost:27017'
@@ -109,6 +113,15 @@ const server = http.createServer((req, res) => {
         } else {
           const newSession = new Session(session, user1, user2, programmingLang, question, new Date())
           
+          // Check valid user and question
+          const questionPromise = fetchQuestion(question, programmingLang)
+          const templatePromise = dbTemplates.findOne({ programmingLanguage: programmingLang })
+          const [questionResult, templateResult] = await Promise.all([questionPromise, templatePromise]);
+          if (!questionResult.signature || !templateResult.template) {
+            throw new Error("Invalid parameters")
+          }
+          const defaultContent = questionResult.definitions + '\n\n\n' + templateResult.template.replace('<template function to go here>', questionResult.signature)
+
           // Create a record in the db first with empty content
           const ret = await dbSessions.insertOne(newSession.getJsonified())
           
@@ -116,21 +129,23 @@ const server = http.createServer((req, res) => {
 
           // Fetch default template for language from mongoDb
 
-          // Add the new YDoc with default tempalte to the session
-          newSession.setYDoc(createYDoc(session))
+          // Add the new YDoc with default template to the session
+          newSession.setYDoc(createYDoc(session, defaultContent))
           console.log('New session created (', user1, ',', user2, '):', session)
           sessions.set(session, newSession)
+          
+          // Add session timeout and scheduled updater for db
           const sessionTimeout = setTimeout(() => endSession(newSession), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
           const scheduledUpdater = setInterval(async () => {
             if (newSession.updated) {
               sessionTimeout.refresh()
-              const queryupdate = newSession.getUpdateDocJsonsified()
-              await dbSessions.updateOne(queryupdate[0], queryupdate[1], {upsert: false} )
+              const [query, update] = newSession.getUpdateDocJsonsified()
+              await dbSessions.updateOne(query, update, {upsert: false} )
               console.log(session, 'content updated')
             }
           }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
-          
           newSession.scheduledUpdater = scheduledUpdater
+          
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }))
         }
@@ -140,6 +155,9 @@ const server = http.createServer((req, res) => {
         if (e instanceof MongoError && e.code === 11000) {
           res.writeHead(409, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ status: 'Duplicate session', time: new Date().toISOString() }))
+        } else if (e instanceof Error && e.message === "Invalid parameters") {
+          res.writeHead(409, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ status: 'Invalid parameters', time: new Date().toISOString() }))
         } else {
           res.writeHead(500, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ status: 'Internal Server Error', time: new Date().toISOString() }))
@@ -211,6 +229,28 @@ async function endSession(session) {
   
   // remove Session from Sessions map
   sessions.delete(session.sessionId)
+}
+
+async function validateUser(userId) {
+  const response = await fetch(userService + '/' + userId, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  });
+  const data = await response.json();
+  return data
+}
+
+async function fetchQuestion(questionId, language) {
+  const response = await fetch(questionService + 'questions/' + questionId + '/template?lang=' + language, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  });
+  const data = await response.json();
+  return data
 }
 
 const HOST = process.env.HOST || 'localhost'

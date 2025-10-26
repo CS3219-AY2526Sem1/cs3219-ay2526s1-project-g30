@@ -9,8 +9,8 @@ import { MonacoBinding } from "y-monaco"
 
 function App() {
 
-  const SERVER = 'wss://192.168.1.50:1234' // Collab server address with port
-  const ROOM = 'monaco-editor-template14' // SESSION ID
+  const SERVER = 'ws://192.168.1.50:1234' // Collab server address with port
+  const ROOM = 'monaco-editor-template38' // SESSION ID
   const USERID = 'uidUser1'
   let undoManager
 
@@ -81,18 +81,19 @@ function App() {
       trackedOrigins: new Set([binding]),
       ignoreRemoteMapChanges: true
     })
-
-    // Trying to recover cursor on undo and redo
-    /*
+    
+    // Store and restore cursor location on undo with UndoManager
     undoManager.on('stack-item-added', event => {
       // save the current cursor location on the stack-item
-      event.stackItem.meta.set('cursor-location', getRelativeCursorLocation())
+      event.stackItem.meta.set('cursor-location', editorRef.current.getPosition())
     })
 
     undoManager.on('stack-item-popped', event => {
       // restore the current cursor location on the stack-item
-      restoreCursorLocation(event.stackItem.meta.get('cursor-location'))
-    })*/
+      const position = event.stackItem.meta.get('cursor-location');
+      editor.setPosition(position);
+      editor.revealPositionInCenter(position);
+    })
 
     console.log(undoManager)
 
@@ -102,6 +103,7 @@ function App() {
       label: 'Undo',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyZ],
       run: () => {
+        console.log("undo")
         undoManager.undo()
       }
     })
@@ -112,6 +114,7 @@ function App() {
       label: 'Redo',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyZ],
       run: () => {
+        console.log("redo")
         undoManager.redo()
       }
     })
