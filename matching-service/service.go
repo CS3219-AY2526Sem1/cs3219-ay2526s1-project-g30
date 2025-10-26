@@ -40,7 +40,8 @@ func getQuestionFromService(difficulty string, topic string, user1ID string, use
 	// HACK: temply change api fmt for ques compatibility
 	baseURL := getEnv("QUESTION_SERVICE_URL", "http://localhost:8081")
 	// url := fmt.Sprintf("%s/api/v1/questions/random?difficulty=%s&topic=%s&user1=%s&user2=%s", baseURL, difficulty, topic, user1ID, user2ID)
-	url := fmt.Sprintf("%s/questions/randomQuestion?difficulty=%s&topic=%s&user1=%s&user2=%s", baseURL, difficulty, topic, user1ID, user2ID)
+	// Ques service use `category` instead of `topic`. We need to reach a cons
+	url := fmt.Sprintf("%s/questions/randomQuestion?difficulty=%s&category=%s&user1=%s&user2=%s", baseURL, difficulty, topic, user1ID, user2ID)
 
 	log.Info().Str("url", url).Msg("Requesting question from Question Service...")
 
