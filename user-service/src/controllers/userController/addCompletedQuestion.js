@@ -1,4 +1,5 @@
 const User = require('../../models/User');
+const mongoose = require('mongoose');
 
 const addCompletedQuestion = async (req, res) => {
   const { userId, questionId } = req.body;
