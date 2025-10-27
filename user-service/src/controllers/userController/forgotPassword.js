@@ -7,7 +7,7 @@ const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email: req.body.email });
 
     if (!user) {
-      return res.json({ message: 'If a user with that email exists, a reset link has been sent.' });
+      return res.json({ message: 'A reset link has been sent to your email.' });
     }
 
     const resetToken = crypto.randomBytes(20).toString('hex');
