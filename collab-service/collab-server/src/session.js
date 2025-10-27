@@ -58,7 +58,6 @@ export class Session {
                 updatedAt: new Date() 
             } 
         }
-        this.updated = false
         return [query, update]
     }
 
