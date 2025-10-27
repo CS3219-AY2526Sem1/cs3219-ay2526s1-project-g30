@@ -17,16 +17,16 @@ const forgotPassword = async (req, res) => {
       .update(resetToken)
       .digest('hex');
     
-    user.passwordResetExpires = Date.now() + 10 * 60 * 1000;
+    user.passwordResetExpires = Date.now() + 30 * 60 * 1000;
     
     await user.save({ validateBeforeSave: false });
 
-    const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}`;
-    const message = `Forgot your password? Please click the link below to set a new one. This link is valid for 10 minutes.\n\n${resetUrl}\n\nIf you didn't forget your password, please ignore this email.`;
+    const resetUrl = `${req.protocol}://${req.get('host')}/api/users/reset-password/${resetToken}`;
+    const message = `Forgot your password? Please click the link below to set a new one. This link is valid for 30 minutes.\n\n${resetUrl}\n\nIf you didn't forget your password, please ignore this email.`;
 
     await sendEmail({
       email: user.email,
-      subject: 'Your PeerPrep Password Reset Link (Valid for 10 min)',
+      subject: 'Your PeerPrep Password Reset Link (Valid for 30 min)',
       message,
     });
 
