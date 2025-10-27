@@ -80,7 +80,7 @@ MongoClient.connect(mongoOnlineUrl, {
 //               constants.SSL_OP_NO_TLSv1_1
 // }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // Security headers
   // res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
   // res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -193,9 +193,7 @@ const server = http.createServer((req, res) => {
           res.writeHead(400, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ status: 'Bad request', time: new Date().toISOString() }))
         } else {
-          
           // Check if valid user and valid user for session
-          validateUser(user)
           if (!sessions.has(sessionId) || !sessions.get(sessionId)?.isValidUser(user)) {
             throw new Error('Invalid parameters')
           }
@@ -240,7 +238,7 @@ function onSocketError(err) {
   console.error(err)
 }
 
-server.on('upgrade', (request, socket, head) => {
+server.on('upgrade', async (request, socket, head) => {
   // You may check auth of request here..
   // Call `wss.HandleUpgrade` *after* you checked whether the client has access
   // (e.g. by checking cookies, or url parameters).
@@ -274,9 +272,32 @@ async function endSession(session, reason) {
   try {
     session.endSession(reason)
     // Send PUT Request to User service
+    const dataUser1 = {
+      userId: session.user1,
+      questionId: session.questionId
+    }
+    const dataUser2 = {
+      userId: session.user1,
+      questionId: session.questionId
+    }
+    const updateUser1Promise = fetch(userService + 'api/users/profile/add-completed-question', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dataUser1)
+    })
+
+    const updateUser2Promise = fetch(userService + 'api/users/profile/add-completed-question', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dataUser2)
+    })
 
     // Mark the session as inactive in MongoDB
-    await dbSessions.updateOne(
+    const updateDbPromise = dbSessions.updateOne(
       { sessionId: session.sessionId },
       { $set: { 
             status: session.status, 
@@ -285,6 +306,12 @@ async function endSession(session, reason) {
       {upsert: false}
     )
     
+    const [updateUser1Result, updateUser2Result, updateDbResult] = await Promise.all([updateUser1Promise, updateUser2Promise, updateDbPromise])
+
+    console.log(updateUser1Result)
+    console.log(updateUser2Result)
+    console.log(updateDbResult)
+
     // remove Session from Sessions map
     sessions.delete(session.sessionId)
     console.log('Successfully ended session:', session.sessionId)
