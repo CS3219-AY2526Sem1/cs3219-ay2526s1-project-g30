@@ -128,7 +128,7 @@ const server = http.createServer((req, res) => {
           // Fetch default template for language from mongoDb
           const templatePromise = dbTemplates.findOne({ programmingLanguage: programmingLang })
           const [questionResult, templateResult, validUser1, validUser2] = await Promise.all([questionPromise, templatePromise, valU1Promise, valU2Promise]);
-          if (!questionResult.signature || !templateResult.template || !validUser1 || !validUser2) {
+          if (!questionResult.signature || !templateResult.template || !validUser1 || !validUser2 || user1 === user2) {
             throw new Error("Invalid parameters")
           }
 
@@ -297,17 +297,23 @@ async function endSession(session, reason) {
 }
 
 async function validateUser(userId) {
-  const response = await fetch(userService + '/' + userId, {
+  const response = await fetch(userService + 'api/users/' + userId, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
     }
   });
-  // console.log(response)
-  const data = await response //response.json();
-  // console.log(data)
-  // Check datas to see if valid
-  return true
+  console.log(response)
+  try {
+    const data = await response.json();
+    // console.log(data)
+    // Check datas to see if valid
+    return data._id
+  }
+  catch (e) {
+    console.error(e)
+    return false
+  }
 }
 
 async function fetchQuestion(questionId, language) {
