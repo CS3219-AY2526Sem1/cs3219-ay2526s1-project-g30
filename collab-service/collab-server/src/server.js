@@ -2,13 +2,12 @@
 import dotenv from 'dotenv'
 import WebSocket from 'ws'
 import http from 'http'
-import https from 'http'
+import https from 'https'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import * as number from 'lib0/number.js'
 import { Session } from './session.js'
-import { constants } from 'crypto'
 import { setupWSConnection, createYDoc, sessions } from './utils.js'
 import { MongoClient, MongoError } from 'mongodb'
 
@@ -25,9 +24,10 @@ const mongoOnlineUrl = process.env.MONGO_DB_URL || 'mongodb://localhost:27017'
 const dbSessionName = 'session_storage'
 const dbTemplateName = 'default_templates'
 let dbSessions, dbTemplates
+let dbConnectionPromise
 
 // Connect to MongoDB
-MongoClient.connect(mongoOnlineUrl, {
+dbConnectionPromise = MongoClient.connect(mongoOnlineUrl, {
   serverSelectionTimeoutMS: 5000,
   connectTimeoutMS: 10000,
   // CRITICAL: Add these TLS options
@@ -45,28 +45,52 @@ MongoClient.connect(mongoOnlineUrl, {
     }, 1000 * 60)
 })
 .catch(err => console.error('MongoDB connection error:', err))
-.then(async () => {
-  // Load active sessions from MongoDB on server start
-  const findResult = await dbSessions.find({ status: 'Active' })
-  for await (const storedSession of findResult) {
-    const newSession = new Session(storedSession.sessionId, storedSession.user1, storedSession.user2,
-      storedSession.language, storedSession.question, storedSession.startTime)
-    newSession.setYDoc(createYDoc(storedSession.sessionId, storedSession.content))
-    console.log('Stored session retrieved (', storedSession.user1, ',', storedSession.user2, '):', storedSession.sessionId)
-    sessions.set(storedSession.sessionId, newSession)
-    const sessionTimeout = setTimeout(() => endSession(newSession), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
-    const scheduledUpdater = setInterval(async () => {
-      if (newSession.updated) {
-        sessionTimeout.refresh()
-        const queryupdate = newSession.getUpdateDocJsonsified()
-        await dbSessions.updateOne(queryupdate[0], queryupdate[1], {upsert: false} )
-        console.log(storedSession.sessionId, 'content updated')
-      }
-    }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
-    newSession.scheduledUpdater = scheduledUpdater
-  }
-})
 
+async function ensureDbConnected() {
+  if (!dbSessions || !dbTemplates) {
+    console.log("Waiting for DB connection")
+    await dbConnectionPromise
+  }
+  if (!dbSessions || !dbTemplates) {
+    throw new Error('Database connection failed')
+  }
+}
+
+// Function to load active sessions from MongoDB
+async function loadActiveSessions() {
+  try {
+    await ensureDbConnected()
+    
+    const findResult = await dbSessions.find({ status: 'Active' })
+    for await (const storedSession of findResult) {
+      const newSession = new Session(storedSession.sessionId, storedSession.user1, storedSession.user2,
+        storedSession.language, storedSession.question, storedSession.startTime)
+      newSession.setYDoc(createYDoc(storedSession.sessionId, storedSession.content))
+      console.log('Stored session retrieved (', storedSession.user1, ',', storedSession.user2, '):', storedSession.sessionId)
+      sessions.set(storedSession.sessionId, newSession)
+      
+      const sessionTimeout = setTimeout(() => endSession(newSession, "Session has ended due to inactivity"), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
+      
+      const scheduledUpdater = setInterval(async () => {
+        try {
+          if (newSession.updated) {
+            sessionTimeout.refresh()
+            const [query, update] = newSession.getUpdateDocJsonsified()
+            await dbSessions.updateOne(query, update, {upsert: false} )
+            console.log(storedSession.sessionId, 'content updated')
+            newSession.updated = false
+          }
+        } catch (e) {
+          console.error('Error updating session', storedSession.sessionId, ':', e)
+        }
+      }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
+      newSession.scheduledUpdater = scheduledUpdater
+      newSession.sessionTimeout = sessionTimeout
+    } 
+  } catch (e) {
+    console.error('Error loading sessions:', e)
+  }
+}
 
 // HTTP server setup
 // SSL/TLS options
@@ -79,7 +103,7 @@ MongoClient.connect(mongoOnlineUrl, {
 //               constants.SSL_OP_NO_TLSv1_1
 // }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // Security headers
   // res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
   // res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -94,75 +118,11 @@ const server = http.createServer((req, res) => {
   } 
   // POST request to create session
   else if (req.method === 'POST' && req.url === '/api/session') {
-    // This is a POST request
-    let body = []
-    req.on('data', (chunk) => {
-        body.push(chunk)
-    })
-    req.on('end', async () => {
-      try {
-        const jsonBody = JSON.parse(Buffer.concat(body).toString())
-        const user1 = jsonBody['user1']
-        const user2 = jsonBody['user2']
-        const session = jsonBody['sessionId']
-        const question = jsonBody['questionId']
-        const programmingLang = jsonBody['programmingLang']
-        if (!user1 || !user2 || !session || !question || !programmingLang) {
-          res.writeHead(400, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ status: 'Bad request', time: new Date().toISOString() }))
-        } else {
-          const newSession = new Session(session, user1, user2, programmingLang, question, new Date())
-          
-          // Check valid user and question
-          // Send req to question server to get parameters and function 
-          const questionPromise = fetchQuestion(question, programmingLang)
-          // Fetch default template for language from mongoDb
-          const templatePromise = dbTemplates.findOne({ programmingLanguage: programmingLang })
-          const [questionResult, templateResult] = await Promise.all([questionPromise, templatePromise]);
-          if (!questionResult.signature || !templateResult.template) {
-            throw new Error("Invalid parameters")
-          }
-          const defaultContent = questionResult.definitions + '\n\n\n' + templateResult.template.replace('<template function to go here>', questionResult.signature)
-
-          // Create a record in the db first with empty content
-          const ret = await dbSessions.insertOne(newSession.getJsonified())
-          
-          // Add the new YDoc with default template to the session
-          newSession.setYDoc(createYDoc(session, defaultContent))
-
-          console.log('New session created (', user1, ',', user2, '):', session)
-          sessions.set(session, newSession)
-          
-          // Add session timeout and scheduled updater for db
-          const sessionTimeout = setTimeout(() => endSession(newSession), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
-          const scheduledUpdater = setInterval(async () => {
-            if (newSession.updated) {
-              sessionTimeout.refresh()
-              const [query, update] = newSession.getUpdateDocJsonsified()
-              await dbSessions.updateOne(query, update, {upsert: false} )
-              console.log(session, 'content updated')
-            }
-          }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
-          newSession.scheduledUpdater = scheduledUpdater
-          
-          res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }))
-        }
+    handleCreateSession(req, res)
+  } // POST request to termiante session
+  else if (req.method === 'POST' && req.url === '/api/terminate') {
+    handleTerminateSession(req, res)
     
-      } catch (e) {
-        console.log(e)
-        if (e instanceof MongoError && e.code === 11000) {
-          res.writeHead(409, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ status: 'Duplicate session', time: new Date().toISOString() }))
-        } else if (e instanceof Error && e.message === "Invalid parameters") {
-          res.writeHead(409, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ status: 'Invalid parameters', time: new Date().toISOString() }))
-        } else {
-          res.writeHead(500, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ status: 'Internal Server Error', time: new Date().toISOString() }))
-        }
-      }
-    })
   }
   // Unhandled requests
   else {
@@ -170,6 +130,251 @@ const server = http.createServer((req, res) => {
     res.end('404 Not Found')
   }
 })
+
+async function handleCreateSession(req, res) {
+  let body = []
+  
+  const timeout = setTimeout(() => {
+    res.writeHead(408, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'Request timeout' }))
+    req.destroy()
+  }, 30000)
+
+  req.on('data', (chunk) => {
+      body.push(chunk)
+  })
+  
+  req.on('end', async () => {
+    clearTimeout(timeout)
+    try {
+      await ensureDbConnected()
+
+      const jsonBody = JSON.parse(Buffer.concat(body).toString())
+      const user1 = jsonBody['user1']
+      const user2 = jsonBody['user2']
+      const session = jsonBody['sessionId']
+      const question = jsonBody['questionId']
+      const programmingLang = jsonBody['programmingLang']
+      if (!user1 || !user2 || !session || !question || !programmingLang) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ status: 'Bad request', time: new Date().toISOString() }))
+        return
+      } 
+      const newSession = new Session(session, user1, user2, programmingLang, question, new Date())
+      
+      // Check valid user and question
+      // Send req to question server to get parameters and function 
+      // Fetch default template for language from mongoDb
+      const [questionResult, templateResult, validUser1, validUser2] = await Promise.all([
+        fetchQuestion(question, programmingLang),
+        dbTemplates.findOne({ programmingLanguage: programmingLang }),
+        validateUser(user1),
+        validateUser(user2)])
+
+      if (!questionResult.signature || !templateResult?.template || !validUser1 || !validUser2 || user1 === user2) {
+        throw new Error("Invalid parameters")
+      }
+
+      const defaultContent = questionResult.definitions + '\n\n\n' + templateResult.template.replace('<template function to go here>', questionResult.signature)
+      
+      // Create a record in the db first with empty content
+      await dbSessions.insertOne(newSession.getJsonified())
+      
+      // Add the new YDoc with default template to the session
+      newSession.setYDoc(createYDoc(session, defaultContent))
+
+      sessions.set(session, newSession)
+      
+      // Add session timeout and scheduled updater for db
+      const sessionTimeout = setTimeout(() => endSession(newSession, "Session has ended due to inactivity"), number.parseInt(process.env.SESSION_TIMEOUT || '3600000'))
+      const scheduledUpdater = setInterval(async () => {
+        try {
+          if (newSession.updated) {
+            sessionTimeout.refresh()
+            const [query, update] = newSession.getUpdateDocJsonsified()
+            await dbSessions.updateOne(query, update, {upsert: false} )
+            console.log(session, 'content updated')
+            newSession.updated = false
+          }
+        } catch (e) {
+          console.error('Error updating session', session, ':', e)
+        }
+      }, number.parseInt(process.env.SESSION_UPDATE || '60000'))
+      newSession.scheduledUpdater = scheduledUpdater
+      newSession.sessionTimeout = sessionTimeout
+      
+      console.log('New session created (', user1, ',', user2, '):', session)
+
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }))
+    
+    } catch (e) {
+      console.error(e)
+      if (e instanceof MongoError && e.code === 11000) {
+        res.writeHead(409, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ status: 'Duplicate session', time: new Date().toISOString() }))
+      } else if (e instanceof Error && e.message === "Invalid parameters") {
+        res.writeHead(409, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ status: 'Invalid parameters', time: new Date().toISOString() }))
+      } else {
+        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ status: 'Internal Server Error', time: new Date().toISOString() }))
+      }
+    }
+  })
+}
+
+async function handleTerminateSession(req, res) {
+  let body = []
+
+  const timeout = setTimeout(() => {
+    res.writeHead(408, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'Request timeout' }))
+    req.destroy()
+  }, 30000)
+
+  req.on('data', (chunk) => {
+      body.push(chunk)
+  })
+
+  req.on('end', async () => {
+    clearTimeout(timeout)
+    try {
+      
+      await ensureDbConnected()
+
+      const jsonBody = JSON.parse(Buffer.concat(body).toString())
+      const user = jsonBody['user']
+      const sessionId = jsonBody['sessionId']
+      if (!user || !sessionId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ status: 'Bad request', time: new Date().toISOString() }))
+        return
+      }
+
+      const session = sessions.get(sessionId)
+      // Check if valid user and valid user for session
+      if (!session?.isValidUser(user)) {
+        throw new Error('Invalid parameters')
+      }
+
+      const successfullyEnded = await endSession(session, "User has ended session")
+      
+      if (successfullyEnded) {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ status: 'ok', time: new Date().toISOString() }))
+      } else {
+        throw new Error('Failed to end session: ' + sessionId)
+      }
+      
+    } catch (e) {
+      console.error('Error terminating session:', e)
+
+      if (e instanceof Error && e.message === "Invalid parameters") {
+        res.writeHead(409, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ status: 'Invalid parameters', time: new Date().toISOString() }))
+      } else {
+        res.writeHead(500, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ status: 'Internal Server Error', time: new Date().toISOString() }))
+      }
+    }
+  })
+}
+
+// End a session
+// Sends PUT requests to User service to update questions completed
+// Marks the session as inactive and destroys relevant data 
+async function endSession(session, reason) {
+  console.log('Ending session:', session.sessionId)
+  try {
+    session.endSession(reason)
+    // Send PUT Request to User service
+    const dataUser1 = {
+      userId: session.user1,
+      questionId: session.question
+    }
+    const dataUser2 = {
+      userId: session.user2,
+      questionId: session.question
+    }
+    const updateUser1Promise = fetch(userService + 'api/users/profile/add-completed-question', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dataUser1)
+    })
+
+    const updateUser2Promise = fetch(userService + 'api/users/profile/add-completed-question', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dataUser2)
+    })
+
+    // Mark the session as inactive in MongoDB
+    const updateDbPromise = dbSessions.updateOne(
+      { sessionId: session.sessionId },
+      { $set: { 
+            status: session.status, 
+            updatedAt: new Date() 
+        } },
+      {upsert: false}
+    )
+    
+    const [updateUser1Result, updateUser2Result, updateDbResult] = await Promise.all([updateUser1Promise, updateUser2Promise, updateDbPromise])
+
+    if (!updateUser1Result.ok) {
+      const error = await updateUser1Result.text()
+      throw new Error(`Failed to update user1: ${error}`)
+    }
+    if (!updateUser2Result.ok) {
+      const error = await updateUser2Result.text()
+      throw new Error(`Failed to update user2: ${error}`)
+    }
+    if (!updateDbResult.acknowledged) {
+      throw new Error('Failed to update database')
+    }
+
+    // remove Session from Sessions map
+    sessions.delete(session.sessionId)
+    console.log('Successfully ended session:', session.sessionId)
+    return true
+  } catch (e) {
+    console.error('Failed to end session', session.sessionId, ':', e)
+    return false
+  }
+}
+
+// Validate a user
+async function validateUser(userId) {
+  try {
+    const response = await fetch(userService + 'api/users/' + userId, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+    return response.status === 200
+  } catch (e) {
+    console.error('Error validating user', userId, ':', e)
+    return false
+  }
+  
+}
+
+// Fetch question params and function given questionId and language
+async function fetchQuestion(questionId, language) {
+  const response = await fetch(questionService + 'questions/' + questionId + '/template?lang=' + language, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
+  
+  return await response.json()
+}
 
 // Websocket server setup
 const wss = new WebSocket.Server({ noServer: true })
@@ -179,10 +384,10 @@ wss.on('connection', setupWSConnection)
 
 // Function to just call when socket has some error
 function onSocketError(err) {
-  console.error(err)
+  console.error('Socket error:', err)
 }
 
-server.on('upgrade', (request, socket, head) => {
+server.on('upgrade', async (request, socket, head) => {
   // You may check auth of request here..
   // Call `wss.HandleUpgrade` *after* you checked whether the client has access
   // (e.g. by checking cookies, or url parameters).
@@ -193,7 +398,7 @@ server.on('upgrade', (request, socket, head) => {
   const sessionId = (parsedURL.pathname || '').slice(1)
   const userid = parsedURL.searchParams.get('userid') || ''
 
-  if (sessions.has(sessionId) && sessions.get(sessionId)?.isValidUser(userid)) {
+  if (sessions.get(sessionId)?.isValidUser(userid)) {
     socket.removeListener('error', onSocketError)
     wss.handleUpgrade(request, socket, head, /** @param {any} ws */ ws => {
       wss.emit('connection', ws, request)
@@ -207,50 +412,6 @@ server.on('upgrade', (request, socket, head) => {
     socket.destroy()
   }
 })
-
-// End a session
-// Sends PUT requests to User service to update questions completed
-// Marks the session as inactive and destroys relevant data 
-async function endSession(session) {
-  console.log('Ending session:', session.sessionId)
-  session.endSession()
-  // Send PUT Request to User service
-
-  // Mark the session as inactive in MongoDB
-  await dbSessions.updateOne(
-    { sessionId: session.sessionId },
-    { $set: { 
-          status: session.status, 
-          updatedAt: new Date() 
-      } },
-    {upsert: false}
-  )
-  
-  // remove Session from Sessions map
-  sessions.delete(session.sessionId)
-}
-
-async function validateUser(userId) {
-  const response = await fetch(userService + '/' + userId, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    }
-  });
-  const data = await response.json();
-  return data
-}
-
-async function fetchQuestion(questionId, language) {
-  const response = await fetch(questionService + 'questions/' + questionId + '/template?lang=' + language, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    }
-  });
-  const data = await response.json();
-  return data
-}
 
 const HOST = process.env.HOST || 'localhost'
 const PORT = number.parseInt(process.env.PORT || '1234')
@@ -269,4 +430,28 @@ server.listen(PORT, () => {
       })
     }
   })
+
+  loadActiveSessions()
+})
+
+// Shutdown server
+process.on('SIGTERM', async () => {
+  console.log('Shutting down server...')
+  
+  // Close WebSocket server
+  wss.close(() => {
+    console.log('WebSocket server closed')
+  })
+  
+  // Close HTTP server
+  server.close(() => {
+    console.log('HTTP server closed')
+    process.exit(0)
+  })
+  
+  // Force exit after 30 seconds
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout')
+    process.exit(1)
+  }, 30000)
 })
