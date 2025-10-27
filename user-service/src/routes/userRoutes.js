@@ -37,12 +37,12 @@ router.get('/verify-email/:token', verifyEmail);
 router.get('/:id', getUserProfile);
 router.post('/forgot-password', forgotPassword);
 router.put('/reset-password/:token', resetPassword);
+router.post('/profile/add-completed-question', addCompletedQuestion);
 
 // Private Routes (Protected by middleware)
 router.put('/profile', protect, updateUserProfile);
 router.delete('/profile', protect, deleteUserProfile);
 router.put('/change-password', protect, changePassword);
 router.put('/profile/picture', protect, upload.single('profilePicture'), uploadProfilePicture);
-router.post('/profile/questions-completed', protect, addCompletedQuestion);
 
 module.exports = router;
