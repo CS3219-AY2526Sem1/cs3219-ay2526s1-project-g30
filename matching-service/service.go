@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"time"
@@ -37,16 +38,35 @@ func getEnv(key, fallback string) string {
 }
 
 func getQuestionFromService(difficulty string, topic string, user1ID string, user2ID string) (string, error) {
-	// HACK: temply change api fmt for ques compatibility
 	baseURL := getEnv("QUESTION_SERVICE_URL", "http://localhost:8081")
-	// url := fmt.Sprintf("%s/api/v1/questions/random?difficulty=%s&topic=%s&user1=%s&user2=%s", baseURL, difficulty, topic, user1ID, user2ID)
-	// Ques service use `category` instead of `topic`. We need to reach a cons
-	url := fmt.Sprintf("%s/questions/randomQuestion?difficulty=%s&category=%s&user1=%s&user2=%s", baseURL, difficulty, topic, user1ID, user2ID)
 
-	log.Info().Str("url", url).Msg("Requesting question from Question Service...")
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil {
+		log.Error().Err(err).Str("base_url", baseURL).Msg("Failed to parse base URL for Question Service")
+		return "", err
+	}
+
+	// 3. Set the path for the specific endpoint
+	parsedURL.Path = "/questions/randomQuestion" // Or whatever the correct path is
+
+	// 4. Create a new set of query parameters
+	params := url.Values{}
+	params.Add("difficulty", difficulty)
+	params.Add("category", topic) // url.Values.Add() will automatically encode this!
+	params.Add("user1", user1ID)
+	params.Add("user2", user2ID)
+
+	// 5. Encode the parameters and add them to the URL
+	parsedURL.RawQuery = params.Encode()
+
+	// 'finalURL' is now guaranteed to be correctly encoded
+	// (e.g., "...&topic=data+structures&...")
+	finalURL := parsedURL.String()
+
+	log.Info().Str("url", finalURL).Msg("Requesting question from Question Service...")
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+	resp, err := client.Get(finalURL)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to send request to Question Service")
 		return "", err
@@ -71,7 +91,7 @@ func informCollaborationService(payload CollaborationRequest) error {
 	// HACK: temply rm `v1` for collab compatibility
 	// url := fmt.Sprintf("%s/api/v1/sessions", baseURL)
 	url := fmt.Sprintf("%s/api/session", baseURL)
-	
+
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to marshal request for Collaboration Service")
@@ -107,7 +127,8 @@ func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult
 		}
 
 		s.mutex.Lock()
-		key := req.Difficulty + "-" + req.Topic
+
+		key := createMatchKey(newUser.Info.Difficulty, newUser.Info.Topic)
 
 		if opponent, chosenLang := s.matcher.FindMatch(newUser, s.waitingPool); opponent != nil {
 			log.Info().Str("user1Id", newUser.Info.UserID).Str("user2Id", opponent.Info.UserID).Str("language", chosenLang).Msg("Match found")
