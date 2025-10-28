@@ -9,8 +9,9 @@ import { MonacoBinding } from "y-monaco"
 
 function App() {
 
-  const SERVER = 'ws://192.168.1.50:1234' // Collab server address with port
-  const ROOM = 'monaco-editor-template38' // SESSION ID
+  const SERVER = 'https://cs3219-ay2526s1-project-g30-322773842817.asia-southeast1.run.app' // Collab server address with port
+  // const SERVER = 'https://192.168.1.50:1234'
+  const ROOM = 'monaco-editor-template09' // SESSION ID
   const USERID = 'uidUser1'
   let undoManager
 
@@ -41,19 +42,21 @@ function App() {
       console.log(event)
       console.log(event.code)
       if (event.code === 1006) {
-        alert("Could not establish connection to server")
+        // alert("Could not establish connection to server")
       } else if (event.code === 3000) {
         alert(event.reason)
       } else {
         console.log("uncaught close code")
       }
-      provider.disconnect()
+      if (event.wasClean) {
+        provider.disconnect()
+      }
     })
     
     const type = doc.getText("monaco");
 
     // Trying to put Presence of other user
-    /*
+    
     const awareness = provider.awareness
     // You can observe when a user updates their awareness information
     awareness.on('change', changes => {
@@ -61,6 +64,7 @@ function App() {
       // we log all awareness information from all users.
       console.log(Array.from(awareness.getStates().values()))
     })
+    /*
     awareness.setLocalStateField('user', {
       // Define a print name that should be displayed
       name: 'Emmanuelle Charpentier',
