@@ -35,7 +35,8 @@ const registerUser = async (req, res) => {
     });
 
     res.status(201).json({
-      message: 'Registration successful! Please check your email for your verification code.'
+      message: 'Registration successful! Please check your email for your verification code.',
+      userId: user._id
     });
 
   } catch (err) {
