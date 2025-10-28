@@ -23,7 +23,7 @@ func findFirstCommonLang(list1 []string, list2 []string) (string, bool) {
 }
 
 func (m *AbsoluteMatcher) FindMatch(newUser *WaitingUser, pool map[string][]*WaitingUser) (*WaitingUser, string) {
-	key := newUser.Info.Difficulty + "-" + newUser.Info.Topic
+	key := createMatchKey(newUser.Info.Difficulty, newUser.Info.Topic)
 
 	opponents := pool[key]
 	if len(opponents) == 0 {
