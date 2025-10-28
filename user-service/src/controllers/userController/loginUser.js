@@ -34,7 +34,10 @@ const loginUser = async (req, res) => {
       { expiresIn: '5h' },
       (err, token) => {
         if (err) throw err;
-        res.json({ token });
+        res.json({ 
+          userId: user.id,
+          token: token 
+        });
       }
     );
   } catch (err) {

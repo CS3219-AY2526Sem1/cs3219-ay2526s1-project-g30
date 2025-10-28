@@ -13,7 +13,7 @@ const {
   forgotPassword,
   resetPassword,
   uploadProfilePicture,
-  verifyEmail,
+  verifyOtp,
   addCompletedQuestion,
 } = require('../controllers/userController');
 
@@ -33,10 +33,10 @@ const upload = multer({ storage: storage, fileFilter: fileFilter });
 // Public Routes
 router.post('/register', registerUser); 
 router.post('/login', loginUser);
-router.get('/verify-email/:token', verifyEmail);
 router.get('/:id', getUserProfile);
 router.post('/forgot-password', forgotPassword);
-router.put('/reset-password/:token', resetPassword);
+router.put('/reset-password', resetPassword);
+router.post('/verify-otp', verifyOtp);
 router.post('/profile/add-completed-question', addCompletedQuestion);
 
 // Private Routes (Protected by middleware)
