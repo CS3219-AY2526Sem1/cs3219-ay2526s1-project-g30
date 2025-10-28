@@ -24,7 +24,7 @@ steps:
       [
         'run',
         'deploy',
-        'question-service',
+        'peerprep-qnsvc',
         '--image',
         'gcr.io/$PROJECT_ID/question-service',
         '--region',
