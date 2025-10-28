@@ -61,3 +61,12 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# Others
+*.un~
+.idea/
+**/node_modules/
+**/.*env
+.vscode/
+**/test/
+env.yaml
