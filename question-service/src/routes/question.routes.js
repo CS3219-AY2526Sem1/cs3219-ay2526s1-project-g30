@@ -1,26 +1,82 @@
+import axios from 'axios'
 import express from 'express';
 import Question from '../models/question.model.js';
 import {generateFunctionTemplate} from "../utils/generateSignature.js";
 
 const router = express.Router();
 
-// get a random question by difficulty and category
+// get a random question by difficulty and category, avoid duplicates for user completed qns
 router.get('/randomQuestion', async (req, res) => {
     try {
-        const { difficulty, category } = req.query;
+        const { difficulty, category, user1, user2 } = req.query;
+        const USER_SERVICE_URL = process.env.USER_SERVICE_URL;
 
-        const matchStage = {};
-        if (difficulty) matchStage.difficulty = difficulty;
-        if (category) matchStage.category = category;
+        // fetch both users’ completed questions in parallel
+        let completed1 = [];
+        let completed2 = [];
 
-        // Efficient random selection: count, random skip, project only _id
-        const count = await Question.countDocuments(matchStage);
-        if (count === 0) {
-            return res.status(404).json({ message: 'No questions found' });
+        if (user1 || user2) {
+            const [user1Data, user2Data] = await Promise.all([
+                user1 ? axios.get(`${USER_SERVICE_URL}/${user1}`).catch(() => ({ data: {} })) : Promise.resolve({ data: {} }),
+                user2 ? axios.get(`${USER_SERVICE_URL}/${user2}`).catch(() => ({ data: {} })) : Promise.resolve({ data: {} })
+            ]);
+
+            completed1 = user1Data.data.questionsCompleted || [];
+            completed2 = user2Data.data.questionsCompleted || [];
         }
-        const random = Math.floor(Math.random() * count);
-        const question = await Question.findOne(matchStage, { _id: 1 }).skip(random);
+
+        const set1 = new Set(completed1);
+        const set2 = new Set(completed2);
+        const union = new Set([...set1, ...set2]);
+
+        // build base filter (difficulty/category)
+        const baseFilter = {};
+        if (difficulty) baseFilter.difficulty = difficulty;
+        if (category) baseFilter.category = category;
+
+        // progressive selection
+        let question = null;
+
+        // Case 1: questions neither have completed
+        let matchStage = { ...baseFilter, _id: { $nin: Array.from(union) } };
+        let count = await Question.countDocuments(matchStage);
+        if (count > 0) {
+            const random = Math.floor(Math.random() * count);
+            question = await Question.findOne(matchStage, { _id: 1 }).skip(random);
+        }
+
+        // Case 2: only user1 has completed all
+        if (!question) {
+            matchStage = { ...baseFilter, _id: { $nin: completed1 } };
+            count = await Question.countDocuments(matchStage);
+            if (count > 0) {
+                const random = Math.floor(Math.random() * count);
+                question = await Question.findOne(matchStage, { _id: 1 }).skip(random);
+            }
+        }
+
+        // Case 3: only user2 has completed all
+        if (!question) {
+            matchStage = { ...baseFilter, _id: { $nin: completed2 } };
+            count = await Question.countDocuments(matchStage);
+            if (count > 0) {
+                const random = Math.floor(Math.random() * count);
+                question = await Question.findOne(matchStage, { _id: 1 }).skip(random);
+            }
+        }
+
+        // Case 4: both have completed everything (fallback)
+        if (!question) {
+            count = await Question.countDocuments(baseFilter);
+            if (count === 0) {
+                return res.status(404).json({ message: 'No questions found at all' });
+            }
+            const random = Math.floor(Math.random() * count);
+            question = await Question.findOne(baseFilter, { _id: 1 }).skip(random);
+        }
+
         res.json({ id: question._id });
+
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: err.message });
@@ -82,6 +138,16 @@ router.post('/', async (req, res) => {
             !p.name || !p.langType || !p.langType.python || !p.langType.java || !p.langType.cpp
         )) {
             return res.status(400).json({ message: 'Each function parameter must have name and langType for python/java/cpp.' });
+        }
+        // do validation on function_return for each of the languages
+        if (!function_return.python) {
+            return res.status(400).json({message: 'Function return in python required.'});
+        }
+        if (!function_return.java) {
+            return res.status(400).json({message: 'Function return in java required.'});
+        }
+        if (!function_return.cpp) {
+            return res.status(400).json({message: 'Function return in cpp required.'});
         }
 
         const newQuestion = new Question({
