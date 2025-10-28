@@ -1,33 +1,39 @@
 const User = require('../../models/User');
-const crypto = require('crypto');
 
 const resetPassword = async (req, res) => {
-  const { newPassword } = req.body;
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ message: 'Email, OTP, and new password are required.' });
+  }
 
   try {
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(req.params.token)
-      .digest('hex');
-
     const user = await User.findOne({
-      passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: Date.now() },
-    });
+      email: email,
+    }).select('+passwordHistory'); 
 
     if (!user) {
-      return res.status(400).json({ message: 'Token is invalid or has expired' });
+      return res.status(400).json({ message: 'Invalid email or OTP.' });
+    }
+    if (user.passwordResetOtp !== otp) {
+      return res.status(400).json({ message: 'Invalid email or OTP.' });
+    }
+    if (user.passwordResetOtpExpires < Date.now()) {
+      user.passwordResetOtp = undefined;
+      user.passwordResetOtpExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
     }
 
     user.password = newPassword;
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
+    user.passwordResetOtp = undefined;
+    user.passwordResetOtpExpires = undefined;
     await user.save();
 
     res.json({ message: 'Password has been reset successfully.' });
   } catch (err) {
     console.error(err);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error during password reset.' });
   }
 };
 

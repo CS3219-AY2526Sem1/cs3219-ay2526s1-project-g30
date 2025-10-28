@@ -6,8 +6,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true, minlength: 8, select: false },
   passwordHistory: { type: [String], select: false},
-  passwordResetToken: String,
-  passwordResetExpires: Date,
+  passwordResetOtp: String,        
+  passwordResetOtpExpires: Date,
   gender: { type: String, enum: ['Male', 'Female', 'Nil'], default: 'Nil'},
   aboutMeInformation: { type: String, required: false, default: ''},
   skillLevel: { type: String, enum: ['beginner','intermediate','advanced'], default: 'beginner' },
@@ -15,8 +15,8 @@ const userSchema = new mongoose.Schema({
   questionsCompleted: { type: [String], default: []},
   profilePictureUrl: { type: String },
   isEmailVerified: { type: Boolean, default: false },
-  emailVerificationToken: String,
-  emailVerificationTokenExpires: Date,
+  emailVerificationOtp: String,      
+  emailVerificationOtpExpires: Date,
 }, {
   timestamps: true
 });

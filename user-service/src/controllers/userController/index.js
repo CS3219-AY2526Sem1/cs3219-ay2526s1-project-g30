@@ -8,6 +8,6 @@ module.exports = {
   forgotPassword: require('./forgotPassword'),
   resetPassword: require('./resetPassword'),
   uploadProfilePicture: require('./uploadProfilePicture'),
-  verifyEmail: require('./verifyEmail'),
   addCompletedQuestion: require('./addCompletedQuestion'),
+  verifyOtp: require('./verifyOtp'),
 }; 
