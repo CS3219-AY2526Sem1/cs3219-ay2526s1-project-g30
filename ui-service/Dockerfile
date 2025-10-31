@@ -13,7 +13,11 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+# Provide dummy values for environment variables required at build time
+# Real values are injected at runtime in Cloud Run
+RUN SESSION_SECRET=build-secret \
+    NEXT_PUBLIC_USER_SERVICE_URL=http://localhost:3001/api/users \
+    npm run build
 
 # Stage 3: Production server
 FROM base AS runner
