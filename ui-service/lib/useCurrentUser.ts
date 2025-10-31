@@ -1,61 +1,88 @@
 /**
  * Server Component utilities for fetching current user data.
- * 
- * TODO: Implement the getCurrentUser function to fetch user data from the backend API.
- * 
- * Implementation guide:
- * - Call your backend API endpoint: GET /api/user/current
- * - Expected response shape:
- *   {
- *     id: string;
- *     username: string;
- *     displayName: string;
- *     profileImage: string | null;
- *   }
- * - Handle authentication errors (401) by redirecting to /login
- * - Use this function in Server Components only
- * 
- * Example implementation:
- *   export async function getCurrentUser(): Promise<CurrentUser | null> {
- *     const response = await fetch(`${API_BASE_URL}/api/user/current`, {
- *       headers: {
- *         'Authorization': `Bearer ${getAuthToken()}`,
- *       },
- *     });
- *     if (!response.ok) {
- *       if (response.status === 401) redirect('/login');
- *       return null;
- *     }
- *     return response.json();
- *   }
+ *
+ * Provides type-safe access to the current authenticated user's information
+ * in Server Components using the authentication session.
+ *
+ * This module uses React's cache() API to memoize results during a single render pass,
+ * preventing duplicate database/API calls.
  */
 
-import { MOCK_USER } from './mockData';
+import 'server-only';
 
+import { cache } from 'react';
+import { getSessionUserInfo } from './dal';
+import * as userServiceClient from './userServiceClient';
+import type { User } from '@/types/auth';
+
+/**
+ * Retrieves the current authenticated user's information from the session.
+ *
+ * This function:
+ * - Checks for a valid authentication session
+ * - Returns only cached session data (userId, email, username)
+ * - Does NOT make external API calls
+ *
+ * For full user profile information (including profile picture, skill level, etc.),
+ * use getCurrentUserProfile() instead.
+ *
+ * @returns Session user info if authenticated, or null otherwise
+ *
+ * @example
+ * ```tsx
+ * export default async function ProfilePage() {
+ *   const currentUser = await getCurrentUser();
+ *   if (!currentUser) return redirect('/login');
+ *   return <p>Logged in as {currentUser.username}</p>;
+ * }
+ * ```
+ */
+export const getCurrentUser = cache(getSessionUserInfo);
+
+/**
+ * Retrieves the current authenticated user's full profile information.
+ *
+ * This function:
+ * - Checks for a valid authentication session
+ * - Makes an API call to user-service to fetch full profile data
+ * - Includes profile picture, skill level, preferred topics, etc.
+ * - Uses React's cache() API to prevent duplicate calls during single render
+ *
+ * @returns Full user profile if authenticated, or null otherwise
+ * @throws Error if user is not authenticated
+ *
+ * @example
+ * ```tsx
+ * export default async function SettingsPage() {
+ *   const profile = await getCurrentUserProfile();
+ *   if (!profile) return redirect('/login');
+ *   return <p>Skill level: {profile.skillLevel}</p>;
+ * }
+ * ```
+ */
+export const getCurrentUserProfile = cache(async (): Promise<User | null> => {
+  const userInfo = await getSessionUserInfo();
+
+  if (!userInfo) {
+    return null;
+  }
+
+  try {
+    return await userServiceClient.getUserProfile(userInfo.username);
+  } catch (error) {
+    // Log error but don't throw - graceful degradation
+    console.error('Failed to fetch user profile:', error);
+    return null;
+  }
+});
+
+/**
+ * Type for CurrentUser interface (for backwards compatibility).
+ * Prefer using the User type from @/types/auth for new code.
+ */
 export interface CurrentUser {
   id: string;
   username: string;
   displayName: string;
   profileImage: string | null;
-}
-
-/**
- * Fetch the current authenticated user.
- * 
- * TODO: Implement this function to fetch from backend API (GET /api/user/current).
- * This should be called in Server Components only.
- * 
- * Currently returns mock data for development.
- * 
- * @returns Current user object or null if not authenticated
- */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
-  // TODO: Replace with actual API call
-  // const response = await fetch(`${process.env.API_BASE_URL}/api/user/current`, { ... });
-  return {
-    id: MOCK_USER.id,
-    username: MOCK_USER.username,
-    displayName: MOCK_USER.displayName,
-    profileImage: MOCK_USER.profileImage,
-  };
 }
