@@ -10,4 +10,6 @@ module.exports = {
   uploadProfilePicture: require('./uploadProfilePicture'),
   addCompletedQuestion: require('./addCompletedQuestion'),
   verifyOtp: require('./verifyOtp'),
+  resendVerificationOtp: require('./resendVerificationOtp'),
+  checkUsername: require('./checkUsername'),
 }; 
