@@ -61,11 +61,11 @@ export function StatusBar({
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-800 bg-black">
+      <div className="shrink-0 border-b border-border bg-background">
         <div className="flex items-center justify-between px-6 py-2 gap-4">
           {/* Left - Timer */}
           <div className="shrink-0 flex items-center gap-2">
-            <span className="font-mono text-lg font-semibold text-white">
+            <span className="font-mono text-lg font-semibold text-foreground">
               {formatTime(timeRemaining)}
             </span>
             <span className="text-sm text-muted-foreground">
