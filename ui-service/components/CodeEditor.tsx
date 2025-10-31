@@ -18,7 +18,7 @@ interface CodeEditorProps {
 
 export function CodeEditor({
   language = 'javascript',
-  defaultValue = '// Start coding here...',
+  defaultValue = '',
   value,
   onChange,
   readOnly = false,
@@ -38,7 +38,7 @@ export function CodeEditor({
       model.setEOL(0) // 0 = LF (\n), 1 = CRLF (\r\n)
     }
 
-    // Call the onEditorReady callback if provided (for future YJS integration)
+    // Call the onEditorReady callback if provided (for YJS integration)
     if (onEditorReady) {
       onEditorReady(editor, monaco)
     }

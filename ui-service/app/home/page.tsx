@@ -1,114 +1,270 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useActionState } from 'react'
 import { Label } from '@/components/ui/label'
 import { MultiSelect } from '@/components/ui/multi-select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { ArrowRight, X, TriangleAlert, ClockFading } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
-import { useTimeout } from '@/hooks/use-timeout'
-import { INITIAL_PROGRAMMING_LANGUAGE_OPTIONS, INITIAL_PREFERRED_LANGUAGES } from '@/lib/mockData'
+import { getUserPreferredLanguages } from '@/app/actions/profile'
+import { startMatching } from '@/app/actions/matching'
+import { PROGRAMMING_LANGUAGE_OPTIONS, INTERVIEW_TOPIC_OPTIONS, DIFFICULTY_LEVELS } from '@/lib/constants'
+import { config } from '@/lib/config'
 
-const LANGUAGE_OPTIONS = INITIAL_PROGRAMMING_LANGUAGE_OPTIONS
+const LANGUAGE_OPTIONS = PROGRAMMING_LANGUAGE_OPTIONS
 
-const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard']
-
-// Mock match data
-const MOCK_MATCH = {
-  questionName: 'Two Sum',
-  matchLanguage: 'Python',
-  matchDifficulty: 'Medium',
-  timeLimit: '45 minutes',
-}
+const DIFFICULTY_OPTIONS = DIFFICULTY_LEVELS
 
 export default function HomePage() {
+  const [isMounted, setIsMounted] = useState(false)
   const [preferredLanguages, setPreferredLanguages] = useState<string[]>([])
+  const [selectedTopic, setSelectedTopic] = useState<string>(INTERVIEW_TOPIC_OPTIONS[0].value)
+  const [isLoadingLanguages, setIsLoadingLanguages] = useState(true)
   const [difficultyLevel, setDifficultyLevel] = useState<string>('Medium')
-  const [isMatching, setIsMatching] = useState(false)
-  const [toastId, setToastId] = useState<string | number | null>(null)
-  const [showMatchDialog, setShowMatchDialog] = useState(false)
-  const [countdownSeconds, setCountdownSeconds] = useState(20)
-  const matchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const [rejectionReason, setRejectionReason] = useState<'manual' | 'timeout' | null>(null)
+  const toastIdRef = useRef<string | number | null>(null)
+  const errorToastIdRef = useRef<string | number | null>(null)
+  const matchingDescriptionRef = useRef<string>('')
+  const [isMatchingActive, setIsMatchingActive] = useState(false)
 
-  // Load user's preferred languages on mount
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(config.matchingService.timeoutSeconds)
+  const [isCountingDown, setIsCountingDown] = useState(false)
+  const intervalIdRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Manage the interval when isCountingDown changes
   useEffect(() => {
-    // TODO: Replace with actual API call to fetch user's preferred languages
-    // For now, use mock data from centralised mockData
-    setPreferredLanguages(INITIAL_PREFERRED_LANGUAGES)
-  }, [])
-
-  // Countdown timer and dialog management
-  useEffect(() => {
-    if (!showMatchDialog) return
-
-    if (toastId) {
-      toast.dismiss(toastId)
+    if (!isCountingDown) {
+      // Clean up interval if it exists
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current)
+        intervalIdRef.current = null
+      }
+      return
     }
 
-    setCountdownSeconds(20)
-
-    const interval = setInterval(() => {
+    // Start a new interval
+    intervalIdRef.current = setInterval(() => {
       setCountdownSeconds((prev) => {
-        const next = prev - 1
-        if (next <= 0) {
-          setShowMatchDialog(false)
-          setRejectionReason('timeout')
-          setIsMatching(false)
+        const newValue = prev - 1
+        if (newValue <= 0) {
+          // Automatically stop counting when reaching 0
+          setIsCountingDown(false)
+          if (intervalIdRef.current) {
+            clearInterval(intervalIdRef.current)
+            intervalIdRef.current = null
+          }
+          return 0
         }
-        return next
+        return newValue
       })
     }, 1000)
 
-    return () => clearInterval(interval)
-  }, [showMatchDialog, toastId])
+    // Cleanup function
+    return () => {
+      if (intervalIdRef.current) {
+        clearInterval(intervalIdRef.current)
+        intervalIdRef.current = null
+      }
+    }
+  }, [isCountingDown])
 
-  // Show rejection warning toast
+  const startCountdown = useCallback(() => {
+    setCountdownSeconds(config.matchingService.timeoutSeconds)
+    setIsCountingDown(true)
+  }, [])
+
+  const stopCountdown = useCallback(() => {
+    setIsCountingDown(false)
+  }, [])
+
+  const resetCountdown = useCallback(() => {
+    setIsCountingDown(false)
+    setCountdownSeconds(config.matchingService.timeoutSeconds)
+  }, [])
+
+  const [matchingState, matchingAction, isMatchingPending] = useActionState(
+    startMatching,
+    undefined
+  )
+
+  // Set mounted flag to avoid hydration issues with Radix components
   useEffect(() => {
-    if (!rejectionReason) return
+    setIsMounted(true)
+  }, [])
 
-    const isManualReject = rejectionReason === 'manual'
-    const icon = isManualReject ? <TriangleAlert /> : <ClockFading />
-    const title = isManualReject
-      ? 'A match was found for you, but you rejected it.'
-      : 'A match was found for you, but you failed to accept it in time.'
-    const description = 'Doing this too often will result in you being deprioritised for matches.'
+  // Load user's preferred languages on mount
+  useEffect(() => {
+    async function loadPreferredLanguages() {
+      try {
+        const languages = await getUserPreferredLanguages()
+        setPreferredLanguages(languages || [])
+      } catch (error) {
+        console.error('Failed to load preferred languages:', error)
+        setPreferredLanguages([])
+      } finally {
+        setIsLoadingLanguages(false)
+      }
+    }
 
+    loadPreferredLanguages()
+  }, [])
+
+  // When matching starts, create toast and start countdown
+  useEffect(() => {
+    if (!isMatchingActive) return
+
+    // Dismiss any existing toasts from previous attempts
+    if (errorToastIdRef.current) {
+      toast.dismiss(errorToastIdRef.current)
+      errorToastIdRef.current = null
+    }
+    if (toastIdRef.current) {
+      toast.dismiss(toastIdRef.current)
+      toastIdRef.current = null
+    }
+
+    // Generate unique toast ID for this attempt
+    toastIdRef.current = Math.random()
+
+    // Reset and start countdown
+    resetCountdown()
+    startCountdown()
+
+    // Create initial toast
     toast(
       <div className="flex items-center gap-3">
-        {icon}
+        <Spinner className="size-5" />
         <div className="flex-1">
-          <div className="font-semibold">{title}</div>
-          <div className="text-sm text-muted-foreground">{description}</div>
+          <div className="font-semibold">Finding a match...</div>
+          <div className="text-sm text-muted-foreground">
+            {matchingDescriptionRef.current} · <span>{config.matchingService.timeoutSeconds}s</span>
+          </div>
         </div>
       </div>,
       {
+        id: toastIdRef.current,
         duration: Infinity,
         position: 'top-center',
-        action: {
-          label: 'OK',
-          onClick: () => {
-            setRejectionReason(null)
-          },
-        },
       }
     )
+  }, [isMatchingActive, resetCountdown, startCountdown])
 
-    return () => {
-      setRejectionReason(null)
+  // Update toast countdown display when countdown changes
+  useEffect(() => {
+    if (!isMatchingActive || !toastIdRef.current) return
+
+    if (countdownSeconds === 0) {
+      toast.dismiss(toastIdRef.current)
+      toastIdRef.current = null
+      setIsMatchingActive(false)
+      return
     }
-  }, [rejectionReason])
+
+    // Update the toast with the new countdown value
+    toast(
+      <div className="flex items-center gap-3">
+        <Spinner className="size-5" />
+        <div className="flex-1">
+          <div className="font-semibold">Finding a match...</div>
+          <div className="text-sm text-muted-foreground">
+            {matchingDescriptionRef.current} · <span>{countdownSeconds}s</span>
+          </div>
+        </div>
+      </div>,
+      {
+        id: toastIdRef.current,
+        duration: Infinity,
+        position: 'top-center',
+      }
+    )
+  }, [countdownSeconds, isMatchingActive])
+
+  // Handle errors and timeout
+  useEffect(() => {
+    if (matchingState?.error) {
+      if (toastIdRef.current) {
+        toast.dismiss(toastIdRef.current)
+        toastIdRef.current = null
+      }
+      stopCountdown()
+      setIsMatchingActive(false)
+
+      // Show all errors including timeout errors with longer duration (8 seconds) so users can read them
+      const id = toast.error(matchingState.error, {
+        duration: 8000,
+        position: 'top-center',
+      })
+      errorToastIdRef.current = id
+    }
+  }, [matchingState?.error, stopCountdown])
+
+  // Handle successful match
+  useEffect(() => {
+    if (matchingState?.success && matchingState?.matchData) {
+      if (toastIdRef.current) {
+        toast.dismiss(toastIdRef.current)
+        toastIdRef.current = null
+      }
+      stopCountdown()
+      setIsMatchingActive(false)
+
+      // Show success toast for 1.5 seconds before redirecting
+      toast.success('Match found! Redirecting to interview room...', {
+        duration: 1500,
+        position: 'top-center',
+      })
+
+      // Redirect after 1.5 seconds
+      const { sessionId, questionId, programmingLang } = matchingState.matchData
+      const searchParams = new URLSearchParams({
+        questionID: questionId,
+        language: programmingLang,
+      })
+      setTimeout(() => {
+        window.location.href = `/match/${sessionId}?${searchParams.toString()}`
+      }, 1500)
+    }
+  }, [matchingState?.success, matchingState?.matchData, stopCountdown])
+
+  // Show loading skeleton before mounting to avoid hydration issues
+  if (!isMounted) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-[90vw] max-w-2xl">
+          <div className="mb-4 pl-2">
+            <h1 className="text-3xl font-bold tracking-tight text-white">
+              Home
+            </h1>
+          </div>
+          <div className="bg-card rounded-lg shadow-lg overflow-hidden border border-border p-8">
+            <div className="flex flex-col gap-8">
+              <div className="border-b border-border pb-6">
+                <h2 className="text-2xl font-semibold text-foreground">
+                  Find a coding interview partner
+                </h2>
+              </div>
+              <div className="space-y-4">
+                <div className="h-5 w-48 bg-muted animate-pulse rounded" />
+                <div className="h-10 bg-muted animate-pulse rounded" />
+              </div>
+              <div className="space-y-4">
+                <div className="h-5 w-32 bg-muted animate-pulse rounded" />
+                <div className="h-10 bg-muted animate-pulse rounded" />
+              </div>
+              <div className="space-y-4">
+                <div className="h-5 w-40 bg-muted animate-pulse rounded" />
+                <div className="h-10 bg-muted animate-pulse rounded" />
+              </div>
+              <div className="h-10 bg-primary/20 animate-pulse rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex items-center justify-center py-20">
@@ -141,6 +297,22 @@ export default function HomePage() {
               />
             </div>
 
+            {/* Topic Selection */}
+            <div className="space-y-4">
+              <Label className="text-base font-semibold">
+                Topic
+              </Label>
+              <Tabs value={selectedTopic} onValueChange={setSelectedTopic}>
+                <TabsList className="grid w-full grid-cols-3">
+                  {INTERVIEW_TOPIC_OPTIONS.map((option) => (
+                    <TabsTrigger key={option.value} value={option.value}>
+                      {option.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+
             {/* Difficulty Level */}
             <div className="space-y-4">
               <Label className="text-base font-semibold">
@@ -159,118 +331,51 @@ export default function HomePage() {
 
             <Separator />
 
-            <Button
-              size="lg"
-              className="w-full text-base font-semibold"
-              disabled={isMatching}
-              onClick={() => {
-                const selectedLanguageLabels = preferredLanguages
-                  .map((lang) => {
-                    const option = LANGUAGE_OPTIONS.find((opt) => opt.value === lang)
-                    return option?.label || lang
-                  })
-                  .join(', ') || 'No languages selected'
-                const matchingDescription = `${selectedLanguageLabels} | ${difficultyLevel}`
+            <form action={matchingAction} className="space-y-4">
+              <input type="hidden" name="difficulty" value={difficultyLevel} />
+              <input type="hidden" name="topic" value={selectedTopic} />
+              <input type="hidden" name="languages" value={preferredLanguages.join(',')} />
 
-                setIsMatching(true)
+              <Button
+                size="lg"
+                type="submit"
+                className="w-full text-base font-semibold"
+                disabled={isMatchingPending || preferredLanguages.length === 0}
+                onClick={() => {
+                  if (isMatchingPending) return
 
-                const id = toast(
-                  <div className="flex items-center gap-3">
-                    <Spinner className="size-5" />
-                    <div className="flex-1">
-                      <div className="font-semibold">Finding a match...</div>
-                      <div className="text-sm text-muted-foreground">{matchingDescription}</div>
-                    </div>
-                  </div>,
-                  {
-                    duration: Infinity,
-                    position: 'top-center',
-                    actionButtonStyle: {
-                      backgroundColor: 'rgb(239, 68, 68)',
-                      color: 'rgb(250, 250, 250)',
-                    },
-                    action: {
-                      label: <div className="flex items-center gap-2"><X className="size-4" /> Cancel</div>,
-                      onClick: () => {
-                        if (id) {
-                          toast.dismiss(id)
-                        }
-                        // Clear the pending match timeout
-                        if (matchTimeoutRef.current) {
-                          clearTimeout(matchTimeoutRef.current)
-                          matchTimeoutRef.current = null
-                        }
-                        // TODO: Call API to cancel matching
-                        // Expected API: POST /api/matching/cancel
-                        // - Cancel the ongoing matching session
-                        // - Handle any cleanup required
-                        setIsMatching(false)
-                        setToastId(null)
-                      },
-                    },
-                  }
-                )
+                  const selectedLanguageLabels = preferredLanguages
+                    .map((lang) => {
+                      const option = LANGUAGE_OPTIONS.find((opt) => opt.value === lang)
+                      return option?.label || lang
+                    })
+                    .join(', ') || 'No languages selected'
+                  
+                  const selectedTopicLabel = INTERVIEW_TOPIC_OPTIONS.find((opt) => opt.value === selectedTopic)?.label || selectedTopic
+                  
+                  const matchingDescription = `${selectedTopicLabel} | ${selectedLanguageLabels} | ${difficultyLevel}`
 
-                setToastId(id)
+                  // Store description in ref for use in effects
+                  matchingDescriptionRef.current = matchingDescription
 
-                // TODO: Implement matching using a Server Action
-                // Expected Server Action: async function startMatching(preferredLanguages: string[], difficultyLevel: string)
-                // - Call POST /api/matching/start with { preferredLanguages, difficultyLevel }
-                // - On success: redirect to /matching/waiting or /interview/:sessionId if matched immediately
-                // - On error: display error message to user, dismiss toast, and set isMatching to false
-                // Implementation: Create app/actions.ts with the startMatching Server Action
-
-                // TODO: Replace with actual WebSocket/polling to listen for match found event
-                // For now, mock a match after 3 seconds
-                matchTimeoutRef.current = setTimeout(() => {
-                  setShowMatchDialog(true)
-                  setCountdownSeconds(20)
-                  matchTimeoutRef.current = null
-                }, 3000)
-              }}
-            >
-              {isMatching ? (
-                <>
-                  <Spinner className="size-4" /> Matching...
-                </>
-              ) : (
-                <>
-                  <ArrowRight /> Start matching
-                </>
-              )}
-            </Button>
+                  // Trigger matching attempt - this will fire the toast/countdown effects
+                  setIsMatchingActive(true)
+                }}
+              >
+                {isMatchingPending ? (
+                  <>
+                    <Spinner className="size-4" /> Matching...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight /> Start matching
+                  </>
+                )}
+              </Button>
+            </form>
           </main>
         </div>
       </div>
-
-      <AlertDialog open={showMatchDialog} onOpenChange={setShowMatchDialog}>
-        <AlertDialogContent>
-          <AlertDialogTitle>Your match is ready!</AlertDialogTitle>
-          <AlertDialogDescription>
-            {MOCK_MATCH.questionName} | {MOCK_MATCH.matchLanguage} | {MOCK_MATCH.matchDifficulty} |{' '}
-            {MOCK_MATCH.timeLimit}
-          </AlertDialogDescription>
-          <div className="flex gap-3 justify-end">
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setShowMatchDialog(false)
-                setRejectionReason('manual')
-                // TODO: Call API to reject the match
-                // Reset matching state
-                setIsMatching(false)
-              }}
-            >
-              <X /> Reject<span className="font-mono">({countdownSeconds})</span>
-            </Button>
-            <AlertDialogAction asChild>
-              <Button>
-                <ArrowRight /> Accept
-              </Button>
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
