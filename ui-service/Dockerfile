@@ -13,10 +13,19 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Provide dummy values for environment variables required at build time
-# Real values are injected at runtime in Cloud Run
-RUN SESSION_SECRET=build-secret \
-    NEXT_PUBLIC_USER_SERVICE_URL=http://localhost:3001/api/users \
+# Accept build arguments for environment variables from Cloud Build
+ARG SESSION_SECRET=build-secret
+ARG NEXT_PUBLIC_USER_SERVICE_URL=http://localhost:3001/api/users
+ARG NEXT_PUBLIC_MATCHING_SERVICE_URL=http://localhost:8080/api/v1
+ARG NEXT_PUBLIC_QUESTION_SERVICE_URL=http://localhost:3002/questions
+ARG NEXT_PUBLIC_COLLAB_SERVICE_URL=http://localhost:8082
+ARG NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=wss://localhost:8082
+RUN SESSION_SECRET=$SESSION_SECRET \
+    NEXT_PUBLIC_USER_SERVICE_URL=$NEXT_PUBLIC_USER_SERVICE_URL \
+    NEXT_PUBLIC_MATCHING_SERVICE_URL=$NEXT_PUBLIC_MATCHING_SERVICE_URL \
+    NEXT_PUBLIC_QUESTION_SERVICE_URL=$NEXT_PUBLIC_QUESTION_SERVICE_URL \
+    NEXT_PUBLIC_COLLAB_SERVICE_URL=$NEXT_PUBLIC_COLLAB_SERVICE_URL \
+    NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=$NEXT_PUBLIC_COLLAB_SERVICE_WS_URL \
     npm run build
 
 # Stage 3: Production server
