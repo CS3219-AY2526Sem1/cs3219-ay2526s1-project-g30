@@ -9,8 +9,10 @@
  */
 
 /**
- * Validates that required environment variables are set.
- * Throws an error if any required variable is missing.
+ * Validates that required environment variables are set at runtime.
+ * This is deferred until after build time to allow the application to be built
+ * without production secrets being available in the Docker build environment.
+ * Secrets are injected at the Cloud Run instance level.
  */
 function validateRequiredEnvVars() {
   const requiredInProduction = [
@@ -88,10 +90,17 @@ export const config = {
   },
 } as const;
 
-// Validate required environment variables on startup
-if (typeof window === 'undefined') {
-  // Only validate on server-side
-  validateRequiredEnvVars();
+/**
+ * Validates configuration at runtime (server startup).
+ * Call this function once when the application starts to ensure all required
+ * environment variables are set. This is deferred from module-load time to
+ * allow containerised builds without production secrets in the build environment.
+ * Secrets are injected at the Cloud Run instance level.
+ */
+export function validateConfigAtRuntime() {
+  if (typeof window === 'undefined') {
+    validateRequiredEnvVars();
+  }
 }
 
 export default config;
