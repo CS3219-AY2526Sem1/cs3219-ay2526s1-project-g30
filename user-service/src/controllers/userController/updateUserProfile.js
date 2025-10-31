@@ -14,14 +14,26 @@ const updateUserProfile = async (req, res) => {
       if (req.body.gender !== undefined) {
         user.gender = req.body.gender;
       }
+      if (req.body.displayName !== undefined) {
+        user.displayName = req.body.displayName;
+      }
+      if (req.body.headline !== undefined) {
+        user.headline = req.body.headline;
+      }
       if (req.body.aboutMeInformation !== undefined) {
         user.aboutMeInformation = req.body.aboutMeInformation;
+      }
+      if (req.body.pronouns !== undefined) {
+        user.pronouns = req.body.pronouns;
       }
       if (req.body.skillLevel !== undefined) {
         user.skillLevel = req.body.skillLevel;
       }
       if (req.body.preferredTopics !== undefined) {
         user.preferredTopics = req.body.preferredTopics;
+      }
+      if (req.body.socialLinks !== undefined) {
+        user.socialLinks = req.body.socialLinks;
       }
 
       const updatedUser = await user.save();
@@ -31,10 +43,14 @@ const updateUserProfile = async (req, res) => {
         username: updatedUser.username,
         email: updatedUser.email,
         gender: updatedUser.gender,
+        displayName: updatedUser.displayName,
+        headline: updatedUser.headline,
         aboutMeInformation: updatedUser.aboutMeInformation,
+        pronouns: updatedUser.pronouns,
         skillLevel: updatedUser.skillLevel,
         preferredTopics: updatedUser.preferredTopics,
         profilePictureUrl: updatedUser.profilePictureUrl,
+        socialLinks: updatedUser.socialLinks,
       });
     } else {
       res.status(404).json({ message: 'User not found' });
