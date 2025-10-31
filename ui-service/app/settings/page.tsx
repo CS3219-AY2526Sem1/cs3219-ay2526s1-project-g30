@@ -38,17 +38,13 @@ import { ImageCrop, ImageCropContent, ImageCropApply, ImageCropReset } from "@/c
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Item,
   ItemActions,
 } from "@/components/ui/item";
 import { SocialLinksSection } from "@/components/SocialLinksSection";
-import { Upload, Trash2, Eye, EyeOff, X, Save, Loader2, RotateCcwKey } from 'lucide-react';
+import { Upload, Trash2, X, Save, Loader2, RotateCcwKey } from 'lucide-react';
 import { SocialLink } from "@/types/social";
 import { ProgrammingLanguage } from "@/types/programming";
 import type { MultiSelectOption } from "@/components/ui/multi-select";
@@ -95,11 +91,6 @@ export default function SettingsPage() {
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
-  });
-  const [showPasswords, setShowPasswords] = useState({
-    current: false,
-    new: false,
-    confirm: false,
   });
 
   // Delete Account
@@ -424,34 +415,14 @@ export default function SettingsPage() {
                       Current Password
                     </FieldLabel>
                   </FieldContent>
-                  <InputGroup>
-                    <InputGroupInput
-                      id="currentPassword"
-                      type={showPasswords.current ? "text" : "password"}
-                      value={passwordForm.currentPassword}
-                      onChange={(e) =>
-                        handlePasswordChange("currentPassword", e.target.value)
-                      }
-                      placeholder="Enter your current password"
-                    />
-                    <InputGroupAddon align="inline-end">
-                      <button
-                        onClick={() =>
-                          setShowPasswords((prev) => ({
-                            ...prev,
-                            current: !prev.current,
-                          }))
-                        }
-                        className="text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {showPasswords.current ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
-                      </button>
-                    </InputGroupAddon>
-                  </InputGroup>
+                  <PasswordInput
+                    id="currentPassword"
+                    value={passwordForm.currentPassword}
+                    onChange={(value) =>
+                      handlePasswordChange("currentPassword", value)
+                    }
+                    placeholder="Enter your current password"
+                  />
                 </Field>
 
                 {/* Password Fields Grid */}
@@ -463,34 +434,14 @@ export default function SettingsPage() {
                         New Password
                       </FieldLabel>
                     </FieldContent>
-                    <InputGroup>
-                      <InputGroupInput
-                        id="newPassword"
-                        type={showPasswords.new ? "text" : "password"}
-                        value={passwordForm.newPassword}
-                        onChange={(e) =>
-                          handlePasswordChange("newPassword", e.target.value)
-                        }
-                        placeholder="Enter your new password"
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <button
-                          onClick={() =>
-                            setShowPasswords((prev) => ({
-                              ...prev,
-                              new: !prev.new,
-                            }))
-                          }
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          {showPasswords.new ? (
-                            <EyeOff className="size-4" />
-                          ) : (
-                            <Eye className="size-4" />
-                          )}
-                        </button>
-                      </InputGroupAddon>
-                    </InputGroup>
+                    <PasswordInput
+                      id="newPassword"
+                      value={passwordForm.newPassword}
+                      onChange={(value) =>
+                        handlePasswordChange("newPassword", value)
+                      }
+                      placeholder="Enter your new password"
+                    />
                   </Field>
 
                   {/* Confirm Password */}
@@ -500,34 +451,14 @@ export default function SettingsPage() {
                         Confirm New Password
                       </FieldLabel>
                     </FieldContent>
-                    <InputGroup>
-                      <InputGroupInput
-                        id="confirmPassword"
-                        type={showPasswords.confirm ? "text" : "password"}
-                        value={passwordForm.confirmPassword}
-                        onChange={(e) =>
-                          handlePasswordChange("confirmPassword", e.target.value)
-                        }
-                        placeholder="Confirm your new password"
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <button
-                          onClick={() =>
-                            setShowPasswords((prev) => ({
-                              ...prev,
-                              confirm: !prev.confirm,
-                            }))
-                          }
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          {showPasswords.confirm ? (
-                            <EyeOff className="size-4" />
-                          ) : (
-                            <Eye className="size-4" />
-                          )}
-                        </button>
-                      </InputGroupAddon>
-                    </InputGroup>
+                    <PasswordInput
+                      id="confirmPassword"
+                      value={passwordForm.confirmPassword}
+                      onChange={(value) =>
+                        handlePasswordChange("confirmPassword", value)
+                      }
+                      placeholder="Confirm your new password"
+                    />
                   </Field>
                 </div>
 
@@ -699,7 +630,6 @@ export default function SettingsPage() {
                 variant="destructive"
                 onClick={handleDeleteAccount}
                 disabled={deleteConfirmationText !== "delete my account" || isDeleting}
-                className="gap-2"
               >
                 {isDeleting ? (
                   <>
