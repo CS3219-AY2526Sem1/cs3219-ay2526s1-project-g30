@@ -5,9 +5,9 @@ steps:
     args:
       - build
       - -t
-      - ${_REGION}-1-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:$COMMIT_SHA
+      - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:$COMMIT_SHA
       - -t
-      - ${_REGION}-1-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:latest
+      - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:latest
       - -f
       - ui-service/Dockerfile
       - ui-service/
@@ -17,21 +17,27 @@ steps:
     name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_REGION}-1-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:$COMMIT_SHA
+      - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:$COMMIT_SHA
     waitFor: ['build-ui-service']
 
   - id: push-ui-service-latest
     name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:latest
+      - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:latest
     waitFor: ['build-ui-service']
 
 # Push UI Service images to Artifact Registry
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:$COMMIT_SHA
-  - ${_REGION}-1-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:latest
+  - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:$COMMIT_SHA
+  - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:latest
 
 # Substitutions for custom variables
 substitutions:
-  _REGION: 'asia-southeast-1'
+  _AR_HOSTNAME: 'asia-southeast1-docker.pkg.dev'
+  _AR_PROJECT_ID: 'cs3219-peerprep-g30'
+  _AR_REPOSITORY: 'cloud-run-source-deploy'
+  _DEPLOY_REGION: 'asia-southeast1'
+  _PLATFORM: 'managed'
+  _SERVICE_NAME: 'cs3219-ay2526s1-project-g30'
+  _TRIGGER_ID: '75ef2963-cd0e-4a56-892c-3ad1d15067be'
