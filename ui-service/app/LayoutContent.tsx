@@ -1,23 +1,27 @@
-'use client'
-
-import { usePathname } from 'next/navigation'
 import { Toaster } from 'sonner'
-import { Navbar } from '@/components/Navbar'
+import { LayoutContentClient } from './LayoutContentClient'
+import { getUserProfile } from '@/app/actions/auth'
+import bgImage from '@/public/bg-rings.jpg'
 
-export function LayoutContent({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
-  const isLoginPage = pathname.startsWith('/login')
-  const isRootPage = pathname === '/'
+export async function LayoutContent({ children }: { children: React.ReactNode }) {
+  // Fetch user profile server-side to pass to Navbar
+  let userProfile = null
+  try {
+    // Try to fetch user profile - will fail if not authenticated
+    userProfile = await getUserProfile()
+  } catch (error) {
+    // User not authenticated or error fetching profile - Navbar will be hidden
+    // This is expected for unauthenticated users
+  }
 
   return (
     <div
-      className="relative min-h-screen flex flex-col bg-cover bg-no-repeat bg-center bg-fixed"
-      style={{ backgroundImage: 'url(/bg-rings.jpg)', backgroundColor: 'hsl(var(--background))', backgroundSize: 'cover', backgroundAttachment: 'fixed' }}
+      className="relative h-screen flex flex-col bg-cover bg-no-repeat bg-center bg-fixed"
+      style={{ backgroundImage: `url(${bgImage.src})`, backgroundColor: 'hsl(var(--background))', backgroundSize: 'cover', backgroundAttachment: 'fixed' }}
     >
-      {!isLoginPage && !isRootPage && <Navbar />}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <LayoutContentClient userProfile={userProfile}>
         {children}
-      </div>
+      </LayoutContentClient>
       <Toaster />
     </div>
   )

@@ -1,8 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useTransition } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -13,39 +12,50 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Settings } from 'lucide-react';
-import { logout, getUserProfile } from '@/app/actions/auth';
+import { logout } from '@/app/actions/auth';
 import type { User } from '@/types/auth';
 
+interface NavbarProps {
+  userProfile: User | null;
+}
+
 /**
- * Navbar Component that fetches and displays user profile information.
- * Uses server actions to securely fetch user data while remaining a client component
- * to handle conditional rendering based on route.
+ * Navbar Component that displays user profile information.
+ * Data is passed as a prop from the server component parent.
+ * This is a client component to handle dropdown interactions and logout.
  */
-export function Navbar() {
-  const [userProfile, setUserProfile] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isPending, startTransition] = useTransition();
+export function Navbar({ userProfile }: NavbarProps) {
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    // Fetch user profile on mount using server action
-    startTransition(async () => {
-      try {
-        const profile = await getUserProfile();
-        setUserProfile(profile);
-      } catch (error) {
-        console.error('Failed to fetch user profile:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    });
+    // Hydration: Set mounted flag after hydration to avoid Radix ID mismatches
+    // eslint-disable-next-line
+    setIsMounted(true);
   }, []);
 
-  if (isLoading || !userProfile) {
+  if (!userProfile) {
     return null;
   }
 
-  const displayName = userProfile.username;
+  const displayName = userProfile.displayName || userProfile.username;
   const profileImageUrl = userProfile.profilePictureUrl || null;
+
+  // Don't render Radix components until after hydration to avoid ID mismatches
+  if (!isMounted) {
+    return (
+      <nav className="sticky top-0 z-50 border-b border-gray-800 bg-black">
+        <div className="flex items-center justify-between px-6 py-4">
+          <Link
+            href="/"
+            className="text-xl font-bold text-white hover:opacity-80 transition-opacity"
+          >
+            PeerPrep
+          </Link>
+          <div className="size-10 rounded-full bg-muted animate-pulse" />
+        </div>
+      </nav>
+    );
+  }
 
   const handleLogout = async () => {
     await logout();
@@ -77,7 +87,7 @@ export function Navbar() {
             {/* User info section */}
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link href={`/profile/${displayName}`} className="flex cursor-pointer">
+                <Link href={`/profile/${userProfile.username}`} className="flex cursor-pointer">
                   <div className="flex items-center gap-3 w-full">
                     <Avatar className="size-10">
                       <AvatarImage
@@ -89,7 +99,7 @@ export function Navbar() {
 
                     <div className="flex-1 text-sm">
                       <p className="font-medium leading-none">{displayName}</p>
-                      <p className="font-mono text-muted-foreground text-xs mt-1">@{displayName}</p>
+                      <p className="font-mono text-muted-foreground text-xs mt-1">@{userProfile.username}</p>
                     </div>
                   </div>
                 </Link>
