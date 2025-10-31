@@ -3,10 +3,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { PasswordInput } from '@/components/ui/password-input';
 import { ViewContent } from '@/components/ViewContent';
 import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { Field, FieldContent, FieldLabel, FieldDescription, FieldError, FieldGroup } from '@/components/ui/field';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Spinner } from '@/components/ui/spinner';
 import { validateUsername, validateEmail, validatePassword, checkUsernameAvailability } from '@/lib/validation';
 import { useDebounceValue } from '@/hooks/use-debounce-value';
@@ -226,13 +227,11 @@ export function SignupView({
             Password
           </FieldLabel>
           <FieldContent>
-            <Input
+            <PasswordInput
               id="signup-password"
-              type="password"
-              placeholder="••••••••"
               value={passwordInput}
-              onChange={(e) => onPasswordChange(e.target.value)}
-              aria-invalid={passwordInput && !passwordValidation.isValid ? 'true' : 'false'}
+              onChange={onPasswordChange}
+              ariaInvalid={passwordInput && !passwordValidation.isValid ? 'true' : 'false'}
             />
             {passwordInput && !passwordValidation.isValid && (
               <FieldError>{passwordValidation.errorMessage || 'Invalid password'}</FieldError>
@@ -245,13 +244,11 @@ export function SignupView({
             Confirm Password
           </FieldLabel>
           <FieldContent>
-            <Input
+            <PasswordInput
               id="signup-password-confirm"
-              type="password"
-              placeholder="••••••••"
               value={passwordConfirmInput}
-              onChange={(e) => onPasswordConfirmChange(e.target.value)}
-              aria-invalid={passwordConfirmInput && !passwordConfirmValidation.isValid ? 'true' : 'false'}
+              onChange={onPasswordConfirmChange}
+              ariaInvalid={passwordConfirmInput && !passwordConfirmValidation.isValid ? 'true' : 'false'}
             />
             {passwordConfirmInput && !passwordConfirmValidation.isValid && (
               <FieldError>{passwordConfirmValidation.errorMessage || 'Invalid password confirmation'}</FieldError>

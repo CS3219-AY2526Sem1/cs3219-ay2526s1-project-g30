@@ -1,16 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
 import { ViewContent } from '@/components/ViewContent';
-import { ArrowRight, ArrowLeft, Info, TriangleAlert } from 'lucide-react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { Field, FieldContent, FieldLabel, FieldError, FieldGroup } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { motion, AnimatePresence } from 'framer-motion';
-import { signInWithPassword, requestPasswordReset } from '@/lib/validation';
+import { signInWithPassword } from '@/lib/validation';
 
 interface PasswordAuthViewProps {
   isActive: boolean;
@@ -18,6 +16,7 @@ interface PasswordAuthViewProps {
   passwordInput: string;
   onPasswordChange: (password: string) => void;
   onSignIn: () => void;
+  onResetPassword: () => void;
   onBack: () => void;
 }
 
@@ -27,26 +26,11 @@ export function PasswordAuthView({
   passwordInput,
   onPasswordChange,
   onSignIn,
+  onResetPassword,
   onBack,
 }: PasswordAuthViewProps) {
-  const router = useRouter();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [signInError, setSignInError] = useState<string>();
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const [resetPasswordAlert, setResetPasswordAlert] = useState<'success' | 'error' | null>(null);
-
-  // Auto-dismiss alert after 10 seconds
-  useEffect(() => {
-    if (resetPasswordAlert === null) {
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      setResetPasswordAlert(null);
-    }, 10000);
-
-    return () => clearTimeout(timeoutId);
-  }, [resetPasswordAlert]);
 
   const handleSignInClick = async () => {
     setSignInError(undefined);
@@ -74,24 +58,6 @@ export function PasswordAuthView({
   const handlePasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !isSigningIn) {
       handleSignInClick();
-    }
-  };
-
-  const handleResetPasswordClick = async () => {
-    setIsResettingPassword(true);
-
-    try {
-      const result = await requestPasswordReset(email);
-
-      if (result.success) {
-        setResetPasswordAlert('success');
-      } else {
-        setResetPasswordAlert('error');
-      }
-    } catch (error) {
-      setResetPasswordAlert('error');
-    } finally {
-      setIsResettingPassword(false);
     }
   };
 
@@ -129,15 +95,13 @@ export function PasswordAuthView({
             Password
           </FieldLabel>
           <FieldContent>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
-              placeholder="••••••••"
               value={passwordInput}
-              onChange={(e) => onPasswordChange(e.target.value)}
+              onChange={onPasswordChange}
               onKeyDown={handlePasswordKeyDown}
               disabled={isSigningIn}
-              aria-invalid={signInError ? 'true' : 'false'}
+              ariaInvalid={signInError ? 'true' : 'false'}
             />
             {signInError && (
               <FieldError>{signInError}</FieldError>
@@ -170,48 +134,13 @@ export function PasswordAuthView({
       <p className="text-sm text-center text-muted-foreground">
         Forgot your password?{' '}
         <Button
-          onClick={handleResetPasswordClick}
-          disabled={isResettingPassword}
+          onClick={onResetPassword}
           variant="link"
-          className="inline-flex gap-2 h-auto p-0"
+          className="h-auto p-0"
         >
-          {isResettingPassword && <Spinner className="size-3" />}
-          {isResettingPassword ? 'Sending reset instructions...' : 'Reset password'}
+          Reset password
         </Button>
       </p>
-
-      <AnimatePresence>
-        {resetPasswordAlert === 'success' && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
-            <Alert>
-              <Info/>
-              <AlertDescription>
-                Password reset instructions have been sent to your email.
-              </AlertDescription>
-            </Alert>
-          </motion.div>
-        )}
-        {resetPasswordAlert === 'error' && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-          >
-            <Alert variant="destructive">
-              <TriangleAlert/>
-              <AlertDescription>
-                The password reset email couldn&apos;t be sent. Please try again.
-              </AlertDescription>
-            </Alert>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </ViewContent>
   );
 }

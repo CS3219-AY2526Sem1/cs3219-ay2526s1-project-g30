@@ -6,6 +6,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { EmailEntryView } from './EmailEntryView';
 import { PasswordAuthView } from './PasswordAuthView';
 import { SignupView } from './SignupView';
+import { OtpVerificationView } from './OtpVerificationView';
+import { SignupCompleteView } from './SignupCompleteView';
+import { ResetPasswordView } from './ResetPasswordView';
 import { generateMockJWT, setMockJWT } from '@/lib/mockAuth';
 
 /**
@@ -71,7 +74,7 @@ import { generateMockJWT, setMockJWT } from '@/lib/mockAuth';
  *    - Redirect to /login after logout
  */
 
-type ViewState = 'email-entry' | 'password-auth' | 'signup';
+type ViewState = 'email-entry' | 'password-auth' | 'signup' | 'otp-verification' | 'signup-complete' | 'reset-password';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -83,6 +86,7 @@ export default function LoginPage() {
   const [signupEmail, setSignupEmail] = useState<string>('');
   const [signupPassword, setSignupPassword] = useState<string>('');
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState<string>('');
+  const [isResetPasswordFlow, setIsResetPasswordFlow] = useState(false);
 
   const handleContinueEmail = () => {
     if (emailInput.trim()) {
@@ -104,12 +108,65 @@ export default function LoginPage() {
     setSignupPasswordConfirm('');
   };
 
+  const handleBackFromOtpVerification = () => {
+    setCurrentView('signup');
+    // Reset OTP for security
+  };
+
+  const handleOtpVerified = () => {
+    // Move to signup complete after OTP verification
+    setCurrentView('signup-complete');
+  };
+
+  const handleSignupComplete = () => {
+    // Redirect to home after completing signup profile
+    const mockToken = generateMockJWT();
+    setMockJWT(mockToken);
+    router.push('/home');
+  };
+
+  const handleSkipSignupComplete = () => {
+    // Skip profile setup and go straight to home
+    const mockToken = generateMockJWT();
+    setMockJWT(mockToken);
+    router.push('/home');
+  };
+
+  const handleBackFromSignupComplete = () => {
+    setCurrentView('otp-verification');
+  };
+
+  const handleInitiateResetPassword = () => {
+    setIsResetPasswordFlow(true);
+    setCurrentView('reset-password');
+  };
+
+  const handleBackFromResetPassword = () => {
+    setIsResetPasswordFlow(false);
+    setCurrentView('password-auth');
+  };
+
+  const handlePasswordReset = () => {
+    // After successful password reset, return to login screen
+    setIsResetPasswordFlow(false);
+    setCurrentView('email-entry');
+    setEmailInput('');
+    setPasswordInput('');
+    setStoredEmail('');
+  };
+
   const handleSignUp = () => {
     setCurrentView('signup');
   };
 
   const handleLogIn = () => {
     setCurrentView('email-entry');
+  };
+
+  const handleSignupInitiated = () => {
+    // After signup form is completed, move to OTP verification
+    setStoredEmail(signupEmail);
+    setCurrentView('otp-verification');
   };
 
   return (
@@ -170,6 +227,7 @@ export default function LoginPage() {
                         router.push('/home');
                       }
                     }
+                    onResetPassword={handleInitiateResetPassword}
                     onBack={handleBackFromPassword}
                   />
                 )}
@@ -186,38 +244,39 @@ export default function LoginPage() {
                     onEmailChange={setSignupEmail}
                     onPasswordChange={setSignupPassword}
                     onPasswordConfirmChange={setSignupPasswordConfirm}
-                    onSignUp={
-                      async () => {
-                        console.log('[LoginPage] Sign-up initiated')
-                        // TODO: Replace mock JWT flow with Server Action
-                        // Once signUp Server Action is implemented in app/actions.ts:
-                        // - Import: import { signUp } from '@/app/actions'
-                        // - Add client-side validation:
-                        //   if (signupPassword !== signupPasswordConfirm) {
-                        //     setErrorMessage('Passwords do not match');
-                        //     return;
-                        //   }
-                        // - Call Server Action:
-                        //   const result = await signUp(usernameInput, signupEmail, signupPassword);
-                        //   if (result.error) {
-                        //     setErrorMessage(result.error);
-                        //   }
-                        //   // On success, signUp will call redirect('/home')
-                        //   // so this code won't be reached
-                        //
-                        // For now, use mock JWT flow:
-                        const mockToken = generateMockJWT();
-                        console.log('[LoginPage] Mock token generated')
-                        setMockJWT(mockToken);
-                        console.log('[LoginPage] Mock token stored, waiting before redirect...')
-                        // Wait for next tick to ensure localStorage write completes
-                        await new Promise(resolve => setTimeout(resolve, 0));
-                        console.log('[LoginPage] Redirecting to /home')
-                        router.push('/home');
-                      }
-                    }
+                    onSignUp={handleSignupInitiated}
                     onBack={handleBackFromSignup}
                     onLogInClick={handleLogIn}
+                  />
+                )}
+
+                {currentView === 'otp-verification' && (
+                  <OtpVerificationView
+                    key="otp-verification"
+                    isActive={currentView === 'otp-verification'}
+                    email={storedEmail}
+                    onOtpVerified={handleOtpVerified}
+                    onBack={handleBackFromOtpVerification}
+                  />
+                )}
+
+                {currentView === 'signup-complete' && (
+                  <SignupCompleteView
+                    key="signup-complete"
+                    isActive={currentView === 'signup-complete'}
+                    onCompleteSignup={handleSignupComplete}
+                    onSkip={handleSkipSignupComplete}
+                    onBack={handleBackFromSignupComplete}
+                  />
+                )}
+
+                {currentView === 'reset-password' && (
+                  <ResetPasswordView
+                    key="reset-password"
+                    isActive={currentView === 'reset-password'}
+                    email={storedEmail}
+                    onPasswordReset={handlePasswordReset}
+                    onBack={handleBackFromResetPassword}
                   />
                 )}
               </AnimatePresence>
