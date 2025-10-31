@@ -1,43 +1,55 @@
 steps:
-  # Build UI Service (Next.js)
-  - id: build-ui-service
-    name: gcr.io/cloud-builders/docker
+  - name: gcr.io/cloud-builders/docker
     args:
       - build
-      - -t
-      - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:$COMMIT_SHA
-      - -t
-      - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:latest
-      - -f
+      - '--no-cache'
+      - '-t'
+      - >-
+        $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - ui-service
+      - '-f'
       - ui-service/Dockerfile
-      - ui-service/
-
-  # Push UI Service images
-  - id: push-ui-service
-    name: gcr.io/cloud-builders/docker
+    id: Build
+  - name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:$COMMIT_SHA
-    waitFor: ['build-ui-service']
-
-  - id: push-ui-service-latest
-    name: gcr.io/cloud-builders/docker
+      - >-
+        $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+    id: Push
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
     args:
-      - push
-      - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:latest
-    waitFor: ['build-ui-service']
+      - run
+      - services
+      - update
+      - $_SERVICE_NAME
+      - '--platform=managed'
+      - >-
+        --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - >-
+        --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
+      - '--region=$_DEPLOY_REGION'
+      - '--quiet'
+    id: Deploy
+    entrypoint: gcloud
 
-# Push UI Service images to Artifact Registry
 images:
-  - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:$COMMIT_SHA
-  - ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/ui-service:latest
+  - >-
+    $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
 
-# Substitutions for custom variables
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
+
 substitutions:
-  _AR_HOSTNAME: 'asia-southeast1-docker.pkg.dev'
-  _AR_PROJECT_ID: 'cs3219-peerprep-g30'
-  _AR_REPOSITORY: 'cloud-run-source-deploy'
-  _DEPLOY_REGION: 'asia-southeast1'
-  _PLATFORM: 'managed'
-  _SERVICE_NAME: 'cs3219-ay2526s1-project-g30'
-  _TRIGGER_ID: '75ef2963-cd0e-4a56-892c-3ad1d15067be'
+  _DEPLOY_REGION: asia-southeast1
+  _AR_HOSTNAME: asia-southeast1-docker.pkg.dev
+  _AR_REPOSITORY: cloud-run-source-deploy
+  _AR_PROJECT_ID: cs3219-peerprep-g30
+  _PLATFORM: managed
+  _SERVICE_NAME: cs3219-ay2526s1-project-g30
+  _TRIGGER_ID: 75ef2963-cd0e-4a56-892c-3ad1d15067be
+
+tags:
+  - gcp-cloud-build-deploy-cloud-run
+  - gcp-cloud-build-deploy-cloud-run-managed
+  - cs3219-ay2526s1-project-g30
