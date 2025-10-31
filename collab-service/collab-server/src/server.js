@@ -171,9 +171,25 @@ async function handleCreateSession(req, res) {
         validateUser(user1),
         validateUser(user2)])
 
-      if (!questionResult.signature || !templateResult?.template || !validUser1 || !validUser2 || user1 === user2) {
+      if (!questionResult.signature || !templateResult?.template || user1 === user2) {
         throw new Error("Invalid parameters")
       }
+      // if (!questionResult.signature) {
+      //   throw new Error("Invalid parameters1")
+      // }
+      // if (!templateResult?.template) {
+      //   throw new Error("Invalid parameters2")
+      // }
+      // if (!validUser1) {
+      //   throw new Error("Invalid parameters3")
+      // }
+      // if (!validUser2) {
+      //   throw new Error("Invalid parameters4")
+      // }
+      // if (user1 === user2) {
+      //   throw new Error("Invalid parameters5")
+      // }
+
 
       const defaultContent = questionResult.definitions + '\n\n\n' + templateResult.template.replace('<template function to go here>', questionResult.signature)
       

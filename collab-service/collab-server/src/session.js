@@ -8,8 +8,8 @@ export class Session {
         this.language = language
         this.question = question
         this.startTime = start
-        this.endTime = new Date(this.startTime)
-        this.endTime.setMinutes(this.startTime.getMinutes() + 60)
+        // this.endTime = new Date(this.startTime)
+        // this.endTime.setMinutes(this.startTime.getMinutes() + 60)
         this.status = 'Active'
         this.updated = true
         this.scheduledUpdater = null // To be destroyed when session is destroyed
