@@ -1,18 +1,20 @@
 'use client';
 
+import { useActionState, useTransition } from 'react';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { ViewContent } from '@/components/ViewContent';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { Field, FieldContent, FieldLabel, FieldError, FieldGroup } from '@/components/ui/field';
-import { useCountdown } from '@/hooks/use-countdown';
 import { Spinner } from '@/components/ui/spinner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { verifyOTP } from '@/app/actions/auth';
 
 interface OtpVerificationViewProps {
   isActive: boolean;
   email: string;
+  password?: string;
   onOtpVerified: () => void;
   onBack: () => void;
 }
@@ -20,69 +22,38 @@ interface OtpVerificationViewProps {
 export function OtpVerificationView({
   isActive,
   email,
+  password,
   onOtpVerified,
   onBack,
 }: OtpVerificationViewProps) {
+  const [state, formAction, isVerifying] = useActionState(verifyOTP, undefined);
+  const [isPending, startTransition] = useTransition();
   const [otpValue, setOtpValue] = useState<string>('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationError, setVerificationError] = useState<string>();
-
-  // Countdown for resend button (60 seconds)
-  const [secondsRemaining, { startCountdown, resetCountdown }] = useCountdown({
-    countStart: 60,
-    countStop: 0,
-    intervalMs: 1000,
-    isIncrement: false,
-  });
-
-  const canResend = secondsRemaining === 0;
-  const [isResending, setIsResending] = useState(false);
-
-  // Auto-start countdown on component mount
-  useEffect(() => {
-    startCountdown();
-  }, [startCountdown]);
 
   const handleVerifyOtp = async () => {
     if (otpValue.length !== 6) return;
 
-    setVerificationError(undefined);
-    setIsVerifying(true);
+    const formData = new FormData();
+    formData.set('email', email);
+    formData.set('otp', otpValue);
+    if (password) {
+      formData.set('password', password);
+    }
 
-    try {
-      // TODO: Replace with actual OTP verification API call
-      // For now, any 6-digit code is considered valid
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    startTransition(() => {
+      formAction(formData);
+    });
+  };
 
-      // Simulate success
-      setIsVerifying(false);
+  // Display error from server action state
+  const displayError = state && !state.success ? state.message : undefined;
+
+  // Trigger callback when verification succeeds
+  useEffect(() => {
+    if (state?.success && !isVerifying) {
       onOtpVerified();
-    } catch (error) {
-      setVerificationError('Invalid OTP. Please try again.');
-      setIsVerifying(false);
     }
-  };
-
-  const handleResendOtp = async () => {
-    if (!canResend || isResending) return;
-
-    setIsResending(true);
-    setVerificationError(undefined);
-
-    try {
-      // TODO: Replace with actual resend OTP API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Reset OTP input and countdown
-      setOtpValue('');
-      resetCountdown();
-      startCountdown();
-      setIsResending(false);
-    } catch (error) {
-      setVerificationError('Failed to resend OTP. Please try again.');
-      setIsResending(false);
-    }
-  };
+  }, [state?.success, isVerifying, onOtpVerified]);
 
   return (
     <ViewContent
@@ -100,7 +71,7 @@ export function OtpVerificationView({
 
       <FieldGroup>
         <Field
-          data-invalid={verificationError ? true : undefined}
+          data-invalid={displayError ? true : undefined}
         >
           <FieldLabel htmlFor="otp">
             Verification code
@@ -124,13 +95,13 @@ export function OtpVerificationView({
               </InputOTP>
             </div>
             <AnimatePresence>
-              {verificationError && (
+              {displayError && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                 >
-                  <FieldError>{verificationError}</FieldError>
+                  <FieldError>{displayError}</FieldError>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -160,35 +131,14 @@ export function OtpVerificationView({
           onClick={onBack}
           variant="secondary"
           className="w-full"
-          disabled={isVerifying || isResending}
+          disabled={isVerifying}
         >
           <ArrowLeft /> Back
         </Button>
       </div>
 
       <p className="text-sm text-center text-muted-foreground">
-        {canResend ? (
-          <>
-            Didn&apos;t receive the code?{' '}
-            <Button
-              onClick={handleResendOtp}
-              variant="link"
-              className="h-auto p-0"
-              disabled={isResending}
-            >
-              {isResending ? (
-                <>
-                  <Spinner className="mr-1 size-3" />
-                  Resending...
-                </>
-              ) : (
-                'Resend'
-              )}
-            </Button>
-          </>
-        ) : (
-          <>Resend code in {secondsRemaining}s</>
-        )}
+        Please check your email for the verification code. It may take a few minutes to arrive.
       </p>
     </ViewContent>
   );

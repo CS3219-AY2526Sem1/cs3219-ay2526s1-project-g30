@@ -3,76 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
+import { signUp, signIn, verifyOTP, requestPasswordReset, resetPassword } from '@/app/actions/auth';
 import { EmailEntryView } from './EmailEntryView';
 import { PasswordAuthView } from './PasswordAuthView';
 import { SignupView } from './SignupView';
 import { OtpVerificationView } from './OtpVerificationView';
 import { SignupCompleteView } from './SignupCompleteView';
 import { ResetPasswordView } from './ResetPasswordView';
-import { generateMockJWT, setMockJWT } from '@/lib/mockAuth';
-
-/**
- * TODO: Server Actions Implementation
- *
- * When implementing actual authentication:
- *
- * 1. Create app/actions.ts with the following Server Actions:
- *    - signIn(email: string, password: string)
- *    - signUp(username: string, email: string, password: string)
- *
- * 2. signIn Server Action should:
- *    - Validate email and password format
- *    - Call POST /api/auth/signin endpoint (or direct DB call)
- *    - Validate credentials against backend
- *    - On success:
- *      * Set secure HTTP-only cookie with auth token
- *      * Return success response with user data
- *      * Use redirect() to send user to /home
- *    - On failure:
- *      * Return error message (e.g., invalid credentials, account not found)
- *      * Do NOT redirect; error will be caught and displayed in UI
- *
- * 3. signUp Server Action should:
- *    - Validate all inputs (username, email, password)
- *    - Ensure passwords match (client-side check before calling)
- *    - Call POST /api/auth/signup endpoint (or direct DB call)
- *    - Check for existing email/username on backend
- *    - Hash password on backend
- *    - Create user account
- *    - On success:
- *      * Set secure HTTP-only cookie with auth token
- *      * Return success response with user data
- *      * Use redirect() to send user to /home
- *    - On failure:
- *      * Return error message (e.g., email already exists, invalid username format)
- *      * Do NOT redirect; error will be caught and displayed in UI
- *
- * 4. Update root page (app/page.tsx) to:
- *    - Use getAuthToken() Server Function instead of mock JWT
- *    - Check for valid auth cookie instead of localStorage
- *    - Keep redirect logic the same
- *
- * 5. Create app/api/auth/signin route:
- *    - POST endpoint
- *    - Validate credentials
- *    - Return auth token or error
- *
- * 6. Create app/api/auth/signup route:
- *    - POST endpoint
- *    - Validate inputs
- *    - Create user account
- *    - Return auth token or error
- *
- * 7. Update PasswordAuthView and SignupView to:
- *    - Handle pending state from Server Action
- *    - Display error messages returned by Server Action
- *    - Show loading state while authentication is in progress
- *
- * 8. Implement logout functionality:
- *    - Create clearAuth() Server Action to delete auth cookie
- *    - Update Navbar component to call logout action
- *    - Redirect to /login after logout
- */
 
 type ViewState = 'email-entry' | 'password-auth' | 'signup' | 'otp-verification' | 'signup-complete' | 'reset-password';
 
@@ -86,6 +23,7 @@ export default function LoginPage() {
   const [signupEmail, setSignupEmail] = useState<string>('');
   const [signupPassword, setSignupPassword] = useState<string>('');
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState<string>('');
+  const [storedPassword, setStoredPassword] = useState<string>('');
   const [isResetPasswordFlow, setIsResetPasswordFlow] = useState(false);
 
   const handleContinueEmail = () => {
@@ -106,6 +44,7 @@ export default function LoginPage() {
     setSignupEmail('');
     setSignupPassword('');
     setSignupPasswordConfirm('');
+    setStoredPassword('');
   };
 
   const handleBackFromOtpVerification = () => {
@@ -119,16 +58,12 @@ export default function LoginPage() {
   };
 
   const handleSignupComplete = () => {
-    // Redirect to home after completing signup profile
-    const mockToken = generateMockJWT();
-    setMockJWT(mockToken);
+    // Redirect to home page after successful profile setup
     router.push('/home');
   };
 
   const handleSkipSignupComplete = () => {
     // Skip profile setup and go straight to home
-    const mockToken = generateMockJWT();
-    setMockJWT(mockToken);
     router.push('/home');
   };
 
@@ -137,18 +72,15 @@ export default function LoginPage() {
   };
 
   const handleInitiateResetPassword = () => {
-    setIsResetPasswordFlow(true);
     setCurrentView('reset-password');
   };
 
   const handleBackFromResetPassword = () => {
-    setIsResetPasswordFlow(false);
     setCurrentView('password-auth');
   };
 
   const handlePasswordReset = () => {
     // After successful password reset, return to login screen
-    setIsResetPasswordFlow(false);
     setCurrentView('email-entry');
     setEmailInput('');
     setPasswordInput('');
@@ -163,10 +95,13 @@ export default function LoginPage() {
     setCurrentView('email-entry');
   };
 
-  const handleSignupInitiated = () => {
+  const handleSignupInitiated = (email: string, password: string) => {
     // After signup form is completed, move to OTP verification
-    setStoredEmail(signupEmail);
-    setCurrentView('otp-verification');
+    if (email.trim()) {
+      setStoredEmail(email);
+      setStoredPassword(password);
+      setCurrentView('otp-verification');
+    }
   };
 
   return (
@@ -202,31 +137,10 @@ export default function LoginPage() {
                     email={storedEmail}
                     passwordInput={passwordInput}
                     onPasswordChange={setPasswordInput}
-                    onSignIn={
-                      async () => {
-                        console.log('[LoginPage] Sign-in initiated')
-                        // TODO: Replace mock JWT flow with Server Action
-                        // Once signIn Server Action is implemented in app/actions.ts:
-                        // - Import: import { signIn } from '@/app/actions'
-                        // - Replace this entire function body with:
-                        //   const result = await signIn(storedEmail, passwordInput);
-                        //   if (result.error) {
-                        //     setErrorMessage(result.error);
-                        //   }
-                        //   // On success, signIn will call redirect('/home')
-                        //   // so this code won't be reached
-                        //
-                        // For now, use mock JWT flow:
-                        const mockToken = generateMockJWT();
-                        console.log('[LoginPage] Mock token generated')
-                        setMockJWT(mockToken);
-                        console.log('[LoginPage] Mock token stored, waiting before redirect...')
-                        // Wait for next tick to ensure localStorage write completes
-                        await new Promise(resolve => setTimeout(resolve, 0));
-                        console.log('[LoginPage] Redirecting to /home')
-                        router.push('/home');
-                      }
-                    }
+                    onSignIn={async () => {
+                      // The PasswordAuthView will handle the server action
+                      // On successful signin, the server action will redirect to /home
+                    }}
                     onResetPassword={handleInitiateResetPassword}
                     onBack={handleBackFromPassword}
                   />
@@ -244,7 +158,7 @@ export default function LoginPage() {
                     onEmailChange={setSignupEmail}
                     onPasswordChange={setSignupPassword}
                     onPasswordConfirmChange={setSignupPasswordConfirm}
-                    onSignUp={handleSignupInitiated}
+                    onSignUpSuccess={handleSignupInitiated}
                     onBack={handleBackFromSignup}
                     onLogInClick={handleLogIn}
                   />
@@ -255,6 +169,7 @@ export default function LoginPage() {
                     key="otp-verification"
                     isActive={currentView === 'otp-verification'}
                     email={storedEmail}
+                    password={storedPassword}
                     onOtpVerified={handleOtpVerified}
                     onBack={handleBackFromOtpVerification}
                   />

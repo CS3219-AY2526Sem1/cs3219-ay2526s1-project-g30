@@ -1,5 +1,6 @@
 'use client';
 
+import { useActionState, useTransition } from 'react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,14 +9,14 @@ import { ViewContent } from '@/components/ViewContent';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { Field, FieldContent, FieldLabel, FieldError, FieldGroup } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
-import { signInWithPassword } from '@/lib/validation';
+import { signIn } from '@/app/actions/auth';
 
 interface PasswordAuthViewProps {
   isActive: boolean;
   email: string;
   passwordInput: string;
   onPasswordChange: (password: string) => void;
-  onSignIn: () => void;
+  onSignIn: (password: string) => Promise<void>;
   onResetPassword: () => void;
   onBack: () => void;
 }
@@ -29,34 +30,24 @@ export function PasswordAuthView({
   onResetPassword,
   onBack,
 }: PasswordAuthViewProps) {
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [signInError, setSignInError] = useState<string>();
+  const [state, formAction, isSubmitting] = useActionState(signIn, undefined);
+  const [isPending, startTransition] = useTransition();
+
+  // Display error from server action state
+  const signInError = state && !state.success ? state.message : undefined;
 
   const handleSignInClick = async () => {
-    setSignInError(undefined);
-    setIsSigningIn(true);
-
-    try {
-      const result = await signInWithPassword(email, passwordInput);
-
-      if (!result.success) {
-        setSignInError(result.errorMessage || 'Sign in failed');
-        setIsSigningIn(false);
-        return;
-      }
-
-      // Sign-in successful - call the onSignIn callback to handle JWT setup
-      setIsSigningIn(false);
-      await onSignIn();
-      // Note: onSignIn handles redirect, so we don't need to do it here
-    } catch (error) {
-      setSignInError('An error occurred during sign-in. Please try again.');
-      setIsSigningIn(false);
-    }
+    const formData = new FormData();
+    formData.set('email', email);
+    formData.set('password', passwordInput);
+    
+    startTransition(() => {
+      formAction(formData);
+    });
   };
 
   const handlePasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !isSigningIn) {
+    if (e.key === 'Enter' && !isSubmitting) {
       handleSignInClick();
     }
   };
@@ -100,7 +91,7 @@ export function PasswordAuthView({
               value={passwordInput}
               onChange={onPasswordChange}
               onKeyDown={handlePasswordKeyDown}
-              disabled={isSigningIn}
+              disabled={isSubmitting}
               ariaInvalid={signInError ? 'true' : 'false'}
             />
             {signInError && (
@@ -114,18 +105,18 @@ export function PasswordAuthView({
         <Button
           onClick={handleSignInClick}
           className="w-full"
-          disabled={isSigningIn}
+          disabled={isSubmitting}
         >
-          {isSigningIn && <Spinner className="size-4" />}
-          {isSigningIn ? 'Signing in...' : 'Sign in'}
-          {!isSigningIn && <ArrowRight className="size-4" />}
+          {isSubmitting && <Spinner className="size-4" />}
+          {isSubmitting ? 'Signing in...' : 'Sign in'}
+          {!isSubmitting && <ArrowRight className="size-4" />}
         </Button>
 
         <Button
           onClick={onBack}
           variant="secondary"
           className="w-full"
-          disabled={isSigningIn}
+          disabled={isSubmitting}
         >
           <ArrowLeft /> Back
         </Button>

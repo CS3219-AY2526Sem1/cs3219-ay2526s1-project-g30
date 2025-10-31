@@ -1,78 +1,47 @@
-'use client'
-
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { getMockJWT, isValidMockJWT } from '@/lib/mockAuth'
+import { redirect } from 'next/navigation'
 
 /**
- * TODO: Replace mock JWT authentication with real auth check
+ * Root page that redirects authenticated users to home
  *
- * Current flow (mock):
- * - Checks localStorage for mock JWT token
- * - Redirects to /home if valid, /login if invalid
+ * Authentication routing is now handled by proxy.ts:
+ * - Unauthenticated users are redirected to /login by proxy
+ * - Authenticated users reach this page and are redirected to /home
  *
- * Future implementation:
+ * This page serves as a fallback in case:
+ * - Proxy fails or is disabled
+ * - JavaScript is disabled in browser
+ * - Manual navigation to root path occurs
  *
- * 1. Create app/actions.ts with getAuthToken Server Function:
- *    - Server Function (not Server Action): async function getAuthToken()
- *    - Reads auth cookie (HTTP-only, secure)
- *    - Validates token on server side
- *    - Returns { isAuthenticated: boolean, user?: UserData }
- *    - Do NOT use useEffect for this; use a Server Component instead
- *
- * 2. Convert this to a Server Component:
- *    - Remove 'use client' directive
- *    - Remove useEffect hook (server-side logic only)
- *    - Call getAuthToken() directly
- *    - Use redirect() from next/navigation for redirects
- *    - Pattern:
- *      export default async function RootPage() {
- *        const { isAuthenticated } = await getAuthToken();
- *        if (isAuthenticated) {
- *          redirect('/home');
- *        }
- *        redirect('/login');
- *      }
- *
- * 3. Benefits of Server Component approach:
- *    - Auth check happens server-side before page renders
- *    - No flash of wrong page on client-side
- *    - More secure (token validation on server)
- *    - Simpler logic without useEffect/router
- *
- * 4. Keep mock flow for now:
- *    - Replace getMockJWT() with getAuthToken() when ready
- *    - Keep useEffect for client-side demo
- *    - Update to Server Component approach later
+ * The error message below displays when redirect() fails to execute,
+ * providing guidance to users on what went wrong.
  */
 
 export default function RootPage() {
-  const router = useRouter()
+  // Redirect authenticated users to home
+  // If this throws, the error boundary below will catch it
+  redirect('/home')
 
-  useEffect(() => {
-    console.log('[RootPage] Checking authentication...')
-    // TODO: Replace mock JWT check with real auth validation
-    // See comments above for implementation details
-    // For now, use mock JWT flow:
-    
-    // Check localStorage synchronously without delay
-    const token = getMockJWT()
-    const isValid = isValidMockJWT(token)
-
-    console.log('[RootPage] Auth check result:', { hasToken: !!token, isValid })
-
-    // Use replace() instead of push() to avoid adding to browser history
-    if (isValid) {
-      // User is authenticated, redirect to home
-      console.log('[RootPage] Valid token found, redirecting to /home')
-      router.replace('/home')
-    } else {
-      // User is not authenticated, redirect to login
-      console.log('[RootPage] No valid token, redirecting to /login')
-      router.replace('/login')
-    }
-  }, [router])
-
-  // Return null or a loading state while redirecting
-  return null
+  // Fallback content (reached if redirect somehow fails or JS is disabled)
+  // This will only display if redirect() doesn't work as expected
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-slate-900 to-slate-800 px-4">
+      <div className="max-w-md space-y-4 text-center">
+        <h1 className="text-2xl font-bold text-white">Redirecting...</h1>
+        <p className="text-slate-300">
+          You should be redirected shortly. If you aren&apos;t, please enable JavaScript or try{' '}
+          <a href="/home" className="font-semibold text-blue-400 hover:text-blue-300 underline">
+            clicking here
+          </a>
+          .
+        </p>
+        <p className="pt-4 text-xs text-slate-500">
+          If you see this page repeatedly, there may be an authentication issue. Please try{' '}
+          <a href="/login" className="font-semibold text-blue-400 hover:text-blue-300 underline">
+            logging in again
+          </a>
+          .
+        </p>
+      </div>
+    </div>
+  )
 }

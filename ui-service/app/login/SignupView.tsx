@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useActionState, useEffect, useTransition } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { PasswordInput } from '@/components/ui/password-input';
 import { ViewContent } from '@/components/ViewContent';
-import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
-import { Field, FieldContent, FieldLabel, FieldDescription, FieldError, FieldGroup } from '@/components/ui/field';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { Field, FieldContent, FieldLabel, FieldError, FieldGroup } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
-import { validateUsername, validateEmail, validatePassword, checkUsernameAvailability } from '@/lib/validation';
-import { useDebounceValue } from '@/hooks/use-debounce-value';
+import { validateUsername, validateEmail, validatePassword } from '@/lib/validation';
+import { signUp } from '@/app/actions/auth';
 
 interface SignupViewProps {
   isActive: boolean;
@@ -22,7 +22,7 @@ interface SignupViewProps {
   onEmailChange: (email: string) => void;
   onPasswordChange: (password: string) => void;
   onPasswordConfirmChange: (password: string) => void;
-  onSignUp: () => void;
+  onSignUpSuccess: (email: string, password: string) => void;
   onBack: () => void;
   onLogInClick: () => void;
 }
@@ -37,61 +37,30 @@ export function SignupView({
   onEmailChange,
   onPasswordChange,
   onPasswordConfirmChange,
-  onSignUp,
+  onSignUpSuccess,
   onBack,
   onLogInClick,
 }: SignupViewProps) {
-  // Debounce username for availability check
-  const [debouncedUsername] = useDebounceValue(usernameInput, 500);
+  const [state, formAction, isSigningUp] = useActionState(signUp, undefined);
+  const [isPending, startTransition] = useTransition();
 
-  const [usernameError, setUsernameError] = useState<string>();
-  const [usernameIsChecking, setUsernameIsChecking] = useState(false);
-  const [usernameIsAvailable, setUsernameIsAvailable] = useState<boolean>();
-  const [isSigningUp, setIsSigningUp] = useState(false);
-
-  const handleSignUpClick = async () => {
-    setIsSigningUp(true);
-    try {
-      await onSignUp();
-    } finally {
-      setIsSigningUp(false);
+  // Watch for successful signup and trigger callback
+  useEffect(() => {
+    if (state?.success) {
+      // Use the email and password from the form
+      const signupEmail = emailInput || '';
+      const signupPassword = passwordInput || '';
+      if (signupEmail.trim() && signupPassword.trim()) {
+        onSignUpSuccess(signupEmail, signupPassword);
+      }
     }
-  };
+  }, [state?.success, emailInput, passwordInput, onSignUpSuccess]);
 
   // Validate username format
   const usernameFormatValidation = useMemo(() => {
     if (!usernameInput) return { isValid: true };
     return validateUsername(usernameInput);
   }, [usernameInput]);
-
-  // Check username availability with debounced value
-  useEffect(() => {
-    if (!debouncedUsername || !usernameFormatValidation.isValid) {
-      setUsernameIsAvailable(undefined);
-      setUsernameError(usernameFormatValidation.errorMessage);
-      return;
-    }
-
-    const checkAvailability = async () => {
-      setUsernameIsChecking(true);
-      try {
-        const result = await checkUsernameAvailability(debouncedUsername);
-        setUsernameIsAvailable(result.isAvailable);
-        setUsernameError(result.errorMessage);
-      } finally {
-        setUsernameIsChecking(false);
-      }
-    };
-
-    checkAvailability();
-  }, [debouncedUsername, usernameFormatValidation]);
-
-  // Clear availability state when user continues typing
-  useEffect(() => {
-    if (usernameInput !== debouncedUsername) {
-      setUsernameIsAvailable(undefined);
-    }
-  }, [usernameInput, debouncedUsername]);
 
   // Validate email
   const emailValidation = useMemo(() => {
@@ -119,7 +88,6 @@ export function SignupView({
     return (
       usernameInput &&
       usernameFormatValidation.isValid &&
-      usernameIsAvailable === true &&
       emailInput &&
       emailValidation.isValid &&
       passwordInput &&
@@ -130,7 +98,6 @@ export function SignupView({
   }, [
     usernameInput,
     usernameFormatValidation.isValid,
-    usernameIsAvailable,
     emailInput,
     emailValidation.isValid,
     passwordInput,
@@ -138,6 +105,22 @@ export function SignupView({
     passwordConfirmInput,
     passwordConfirmValidation.isValid,
   ]);
+
+  // Submit form action on button click
+  const handleSignUpClick = () => {
+    if (!isFormValid) return;
+    
+    const formData = new FormData();
+    formData.set('username', usernameInput);
+    formData.set('email', emailInput);
+    formData.set('password', passwordInput);
+    formData.set('confirmPassword', passwordConfirmInput);
+    
+    // Submit through form action within a transition
+    startTransition(() => {
+      formAction(formData);
+    });
+  };
 
   return (
     <ViewContent
@@ -154,10 +137,15 @@ export function SignupView({
       </div>
 
       <FieldGroup>
+        {state?.message && !state?.success && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+            {state.message}
+          </div>
+        )}
+        
         <Field
           data-invalid={
-            (usernameInput && !usernameFormatValidation.isValid && !usernameIsChecking) ||
-            (usernameInput && !usernameIsChecking && usernameError)
+            (usernameInput && !usernameFormatValidation.isValid)
               ? true
               : undefined
           }
@@ -166,39 +154,20 @@ export function SignupView({
             Username
           </FieldLabel>
           <FieldContent>
-            <InputGroup>
-              <InputGroupInput
-                id="signup-username"
-                type="text"
-                placeholder="jane.smith"
-                value={usernameInput}
-                onChange={(e) => onUsernameChange(e.target.value)}
-                aria-invalid={
-                  (usernameInput && !usernameFormatValidation.isValid && !usernameIsChecking) ||
-                  (usernameInput && !usernameIsChecking && usernameError)
-                    ? 'true'
-                    : 'false'
-                }
-              />
-              {usernameIsChecking && (
-                <InputGroupAddon align="inline-end">
-                  <Spinner className="size-4" />
-                </InputGroupAddon>
-              )}
-              {usernameIsAvailable === true && !usernameIsChecking && (
-                <InputGroupAddon align="inline-end">
-                  <Check className="size-4 text-green-600" />
-                </InputGroupAddon>
-              )}
-            </InputGroup>
-            {usernameInput && usernameIsChecking && (
-              <FieldDescription>Checking availability...</FieldDescription>
-            )}
-            {usernameIsAvailable === true && !usernameIsChecking && (
-              <FieldDescription className="text-green-600">Username is available</FieldDescription>
-            )}
-            {usernameInput && !usernameIsChecking && usernameError && (
-              <FieldError>{usernameError}</FieldError>
+            <Input
+              id="signup-username"
+              type="text"
+              placeholder="your.username"
+              value={usernameInput}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUsernameChange(e.target.value)}
+              aria-invalid={
+                (usernameInput && !usernameFormatValidation.isValid)
+                  ? 'true'
+                  : 'false'
+              }
+            />
+            {usernameInput && !usernameFormatValidation.isValid && (
+              <FieldError>{usernameFormatValidation.errorMessage || 'Invalid username'}</FieldError>
             )}
           </FieldContent>
         </Field>
@@ -211,7 +180,7 @@ export function SignupView({
             <Input
               id="signup-email"
               type="email"
-              placeholder="jane@example.com"
+              placeholder="you@example.com"
               value={emailInput}
               onChange={(e) => onEmailChange(e.target.value)}
               aria-invalid={emailInput && !emailValidation.isValid ? 'true' : 'false'}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useActionState, useTransition } from 'react';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
@@ -11,6 +12,7 @@ import { useCountdown } from '@/hooks/use-countdown';
 import { Spinner } from '@/components/ui/spinner';
 import { validatePassword } from '@/lib/validation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { resetPassword, requestPasswordReset } from '@/app/actions/auth';
 
 interface ResetPasswordViewProps {
   isActive: boolean;
@@ -25,13 +27,14 @@ export function ResetPasswordView({
   onPasswordReset,
   onBack,
 }: ResetPasswordViewProps) {
+  const [resetState, resetFormAction, isResettingPassword] = useActionState(resetPassword, undefined);
+  const [resendState, resendFormAction, isResendingOtp] = useActionState(requestPasswordReset, undefined);
+  const [isPending, startTransition] = useTransition();
+  
   const [otpValue, setOtpValue] = useState<string>('');
   const [newPasswordInput, setNewPasswordInput] = useState<string>('');
   const [confirmPasswordInput, setConfirmPasswordInput] = useState<string>('');
-  const [isResetting, setIsResetting] = useState(false);
   const [resetError, setResetError] = useState<string>();
-  const [canResendOtp, setCanResendOtp] = useState(false);
-  const [isResendingOtp, setIsResendingOtp] = useState(false);
 
   // Countdown for resend OTP button (60 seconds)
   const [secondsRemaining, { startCountdown, resetCountdown }] = useCountdown({
@@ -41,15 +44,26 @@ export function ResetPasswordView({
     isIncrement: false,
   });
 
+  const canResendOtp = secondsRemaining === 0;
+
   // Auto-start countdown on component mount
   useEffect(() => {
     startCountdown();
   }, [startCountdown]);
 
-  // Update resend availability based on countdown
+  // Handle successful password reset
   useEffect(() => {
-    setCanResendOtp(secondsRemaining === 0);
-  }, [secondsRemaining]);
+    if (resetState?.success) {
+      onPasswordReset();
+    }
+  }, [resetState?.success, onPasswordReset]);
+
+  // Handle successful OTP resend
+  useEffect(() => {
+    if (resendState?.success) {
+      resetCountdown();
+    }
+  }, [resendState?.success, resetCountdown]);
 
   // Validate new password
   const newPasswordValidation = useMemo(() => {
@@ -81,46 +95,33 @@ export function ResetPasswordView({
     if (!isFormValid) return;
 
     setResetError(undefined);
-    setIsResetting(true);
 
-    try {
-      // TODO: Replace with actual password reset API call
-      // - email: the user's email
-      // - otpValue: the OTP code entered by the user
-      // - newPasswordInput: the new password
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    const formData = new FormData();
+    formData.set('email', email);
+    formData.set('otp', otpValue);
+    formData.set('password', newPasswordInput);
 
-      // Simulate success
-      setIsResetting(false);
-      onPasswordReset();
-    } catch (error) {
-      setResetError('Failed to reset password. Please try again.');
-      setIsResetting(false);
-    }
+    startTransition(() => {
+      resetFormAction(formData);
+    });
   };
 
   const handleResendOtp = async () => {
     if (!canResendOtp || isResendingOtp) return;
 
-    setIsResendingOtp(true);
     setResetError(undefined);
+    setOtpValue('');
 
-    try {
-      // TODO: Replace with actual resend OTP API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    const formData = new FormData();
+    formData.set('email', email);
 
-      // Reset OTP input and countdown
-      setOtpValue('');
-      resetCountdown();
-      setIsResendingOtp(false);
-    } catch (error) {
-      setResetError('Failed to resend OTP. Please try again.');
-      setIsResendingOtp(false);
-    }
+    startTransition(() => {
+      resendFormAction(formData);
+    });
   };
 
   const handleResetPasswordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && isFormValid && !isResetting) {
+    if (e.key === 'Enter' && isFormValid && !isResettingPassword) {
       handleResetPassword();
     }
   };
@@ -152,7 +153,7 @@ export function ResetPasswordView({
                 maxLength={6}
                 value={otpValue}
                 onChange={setOtpValue}
-                disabled={isResetting}
+                disabled={isResettingPassword}
               >
                 <InputOTPGroup>
                   <InputOTPSlot index={0} />
@@ -178,7 +179,7 @@ export function ResetPasswordView({
               id="new-password"
               value={newPasswordInput}
               onChange={setNewPasswordInput}
-              disabled={isResetting}
+              disabled={isResettingPassword}
               ariaInvalid={newPasswordInput && !newPasswordValidation.isValid ? 'true' : 'false'}
             />
             {newPasswordInput && !newPasswordValidation.isValid && (
@@ -199,7 +200,7 @@ export function ResetPasswordView({
               value={confirmPasswordInput}
               onChange={setConfirmPasswordInput}
               onKeyDown={handleResetPasswordKeyDown}
-              disabled={isResetting}
+              disabled={isResettingPassword}
               ariaInvalid={confirmPasswordInput && !confirmPasswordValidation.isValid ? 'true' : 'false'}
             />
             {confirmPasswordInput && !confirmPasswordValidation.isValid && (
@@ -225,11 +226,11 @@ export function ResetPasswordView({
         <Button
           onClick={handleResetPassword}
           className="w-full"
-          disabled={!isFormValid || isResetting}
+          disabled={!isFormValid || isResettingPassword}
         >
-          {isResetting ? (
+          {isResettingPassword ? (
             <>
-              <Spinner className="mr-2" />
+              <Spinner />
               Resetting...
             </>
           ) : (
@@ -243,7 +244,7 @@ export function ResetPasswordView({
           onClick={onBack}
           variant="secondary"
           className="w-full"
-          disabled={isResetting || isResendingOtp}
+          disabled={isResettingPassword || isResendingOtp}
         >
           <ArrowLeft /> Back
         </Button>
@@ -261,7 +262,7 @@ export function ResetPasswordView({
             >
               {isResendingOtp ? (
                 <>
-                  <Spinner className="mr-1 size-3" />
+                  <Spinner />
                   Resending...
                 </>
               ) : (

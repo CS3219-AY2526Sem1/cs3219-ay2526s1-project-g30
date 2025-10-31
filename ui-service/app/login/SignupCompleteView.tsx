@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useActionState, useState, useMemo, useTransition, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ViewContent } from '@/components/ViewContent';
@@ -13,6 +13,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { PROGRAMMING_LANGUAGES, EXPERIENCE_LEVELS, type ProgrammingLanguage, type ExperienceLevel } from '@/types/programming';
+import { updateUserProfile } from '@/app/actions/auth';
 
 interface SignupCompleteViewProps {
   isActive: boolean;
@@ -27,11 +28,19 @@ export function SignupCompleteView({
   onSkip,
   onBack,
 }: SignupCompleteViewProps) {
+  const [state, formAction, isSubmitting] = useActionState(updateUserProfile, undefined);
+  const [isPending, startTransition] = useTransition();
   const [displayNameInput, setDisplayNameInput] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<ProgrammingLanguage | undefined>();
   const [experienceSliderValue, setExperienceSliderValue] = useState<number[]>([0]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
+
+  // Trigger callback when profile update succeeds
+  useEffect(() => {
+    if (state?.success && !isSubmitting) {
+      onCompleteSignup();
+    }
+  }, [state?.success, isSubmitting, onCompleteSignup]);
 
   // Map slider value (0-2) to experience level
   const selectedExperience: ExperienceLevel | undefined = useMemo(() => {
@@ -65,20 +74,14 @@ export function SignupCompleteView({
   const handleCompleteSignup = async () => {
     if (!isFormValid) return;
 
-    setIsSubmitting(true);
+    const formData = new FormData();
+    formData.set('displayName', displayNameInput);
+    formData.set('preferredLanguage', selectedLanguage || '');
+    formData.set('experienceLevel', selectedExperience || 'beginner');
 
-    try {
-      // TODO: Replace with actual API call to save user profile
-      // - displayNameInput: the user's display name
-      // - selectedLanguage: the selected programming language
-      // - selectedExperience: the selected experience level
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setIsSubmitting(false);
-      onCompleteSignup();
-    } catch (error) {
-      setIsSubmitting(false);
-    }
+    startTransition(() => {
+      formAction(formData);
+    });
   };
 
   return (
