@@ -1,6 +1,7 @@
 "use client"
 
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -49,42 +50,50 @@ import { SocialLink } from "@/types/social";
 import { ProgrammingLanguage } from "@/types/programming";
 import type { MultiSelectOption } from "@/components/ui/multi-select";
 import {
-  INITIAL_DISPLAY_NAME,
-  INITIAL_HEADLINE,
-  INITIAL_BIO,
-  INITIAL_PROFILE_IMAGE,
-  INITIAL_PRONOUNS,
-  INITIAL_SOCIAL_LINKS,
-  INITIAL_PRONOUNS_OPTIONS,
-  INITIAL_PREFERRED_LANGUAGES,
-  INITIAL_PROGRAMMING_LANGUAGE_OPTIONS,
-} from './mockData';
+  PRONOUNS_OPTIONS,
+  PROGRAMMING_LANGUAGE_OPTIONS,
+} from '@/lib/constants';
+import {
+  getCurrentUserProfile,
+  updateUserProfile,
+  changePassword,
+  uploadProfilePicture,
+  deleteAccount,
+} from '@/app/actions/profile';
 
 export default function SettingsPage() {
   // Profile Picture
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(INITIAL_PROFILE_IMAGE);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
+  const [originalProfileImage, setOriginalProfileImage] = useState<string | null>(null);
   const [showCropDialog, setShowCropDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [croppedImageFile, setCroppedImageFile] = useState<File | null>(null);
 
   // Display Name
-  const [displayName, setDisplayName] = useState(INITIAL_DISPLAY_NAME);
+  const [displayName, setDisplayName] = useState("");
+  const [originalDisplayName, setOriginalDisplayName] = useState("");
 
   // Profile Headline
-  const [headline, setHeadline] = useState(INITIAL_HEADLINE);
+  const [headline, setHeadline] = useState("");
+  const [originalHeadline, setOriginalHeadline] = useState("");
 
   // Bio (About Me)
-  const [bio, setBio] = useState(INITIAL_BIO);
+  const [bio, setBio] = useState("");
+  const [originalBio, setOriginalBio] = useState("");
 
   // Pronouns
-  const [pronounOptions, setPronounOptions] = useState<MultiSelectOption[]>(INITIAL_PRONOUNS_OPTIONS);
-  const [pronouns, setPronouns] = useState<string[]>(INITIAL_PRONOUNS);
+  const [pronounOptions, setPronounOptions] = useState<MultiSelectOption[]>(PRONOUNS_OPTIONS);
+  const [pronouns, setPronouns] = useState<string[]>([]);
+  const [originalPronouns, setOriginalPronouns] = useState<string[]>([]);
 
   // Preferred Programming Languages
-  const [preferredLanguages, setPreferredLanguages] = useState<ProgrammingLanguage[]>(INITIAL_PREFERRED_LANGUAGES);
+  const [preferredLanguages, setPreferredLanguages] = useState<ProgrammingLanguage[]>([]);
+  const [originalPreferredLanguages, setOriginalPreferredLanguages] = useState<ProgrammingLanguage[]>([]);
 
   // Social Links
-  const [socialLinks, setSocialLinks] = useState<SocialLink[]>(INITIAL_SOCIAL_LINKS);
+  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
+  const [originalSocialLinks, setOriginalSocialLinks] = useState<SocialLink[]>([]);
 
   // Password Change
   const [passwordForm, setPasswordForm] = useState({
@@ -100,19 +109,59 @@ export default function SettingsPage() {
 
   // Saving state
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+
+  // Load user profile on mount
+  useEffect(() => {
+    async function loadUserProfile() {
+      try {
+        const profile = await getCurrentUserProfile();
+        if (!profile) {
+          toast.error("Failed to load your profile");
+          return;
+        }
+
+        // Set original values
+        setOriginalDisplayName(profile.displayName || profile.username || "");
+        setOriginalHeadline(profile.headline || "");
+        setOriginalBio(profile.bio || profile.aboutMeInformation || "");
+        setOriginalPronouns(profile.pronouns || []);
+        setOriginalPreferredLanguages((profile.preferredTopics as ProgrammingLanguage[]) || []);
+        setOriginalProfileImage(profile.profilePictureUrl || null);
+        setOriginalSocialLinks(profile.socialLinks || []);
+
+        // Set current values
+        setDisplayName(profile.displayName || profile.username || "");
+        setHeadline(profile.headline || "");
+        setBio(profile.bio || profile.aboutMeInformation || "");
+        setPronouns(profile.pronouns || []);
+        setPreferredLanguages((profile.preferredTopics as ProgrammingLanguage[]) || []);
+        setProfileImagePreview(profile.profilePictureUrl || null);
+        setSocialLinks(profile.socialLinks || []);
+      } catch (error) {
+        console.error("Failed to load user profile:", error);
+        toast.error("Failed to load your profile");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadUserProfile();
+  }, []);
 
   // Check if there are any changes
   const hasChanges = useMemo(() => {
-    const profileImageChanged = profileImagePreview !== INITIAL_PROFILE_IMAGE;
-    const displayNameChanged = displayName !== INITIAL_DISPLAY_NAME;
-    const headlineChanged = headline !== INITIAL_HEADLINE;
-    const bioChanged = bio !== INITIAL_BIO;
-    const pronounsChanged = JSON.stringify(pronouns.sort()) !== JSON.stringify(INITIAL_PRONOUNS.sort());
-    const preferredLanguagesChanged = JSON.stringify(preferredLanguages.sort()) !== JSON.stringify(INITIAL_PREFERRED_LANGUAGES.sort());
-    const socialLinksChanged = JSON.stringify(socialLinks) !== JSON.stringify(INITIAL_SOCIAL_LINKS);
+    const profileImageChanged = profileImagePreview !== originalProfileImage;
+    const displayNameChanged = displayName !== originalDisplayName;
+    const headlineChanged = headline !== originalHeadline;
+    const bioChanged = bio !== originalBio;
+    const pronounsChanged = JSON.stringify(pronouns.sort()) !== JSON.stringify(originalPronouns.sort());
+    const preferredLanguagesChanged = JSON.stringify(preferredLanguages.sort()) !== JSON.stringify(originalPreferredLanguages.sort());
+    const socialLinksChanged = JSON.stringify(socialLinks) !== JSON.stringify(originalSocialLinks);
 
     return profileImageChanged || displayNameChanged || headlineChanged || bioChanged || pronounsChanged || preferredLanguagesChanged || socialLinksChanged;
-  }, [profileImagePreview, displayName, headline, bio, pronouns, preferredLanguages, socialLinks]);
+  }, [profileImagePreview, displayName, headline, bio, pronouns, preferredLanguages, socialLinks, originalProfileImage, originalDisplayName, originalHeadline, originalBio, originalPronouns, originalPreferredLanguages, originalSocialLinks]);
 
   // Handlers
   const validateImageFile = (file: File): boolean => {
@@ -138,12 +187,26 @@ export default function SettingsPage() {
 
   const handleCropComplete = (croppedImage: string) => {
     setProfileImagePreview(croppedImage);
+    
+    // Convert data URL to File object for upload
+    fetch(croppedImage)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], 'profile-picture.png', { type: 'image/png' });
+        setCroppedImageFile(file);
+      })
+      .catch(error => {
+        console.error('Failed to convert cropped image to file:', error);
+        toast.error('Failed to process cropped image');
+      });
+    
     setShowCropDialog(false);
     setSelectedFile(null);
   };
 
   const handleRemoveProfileImage = () => {
     setProfileImagePreview(null);
+    setCroppedImageFile(null);
   };
 
   const handlePasswordChange = (field: keyof typeof passwordForm, value: string) => {
@@ -154,73 +217,119 @@ export default function SettingsPage() {
   };
 
   const handleSaveSettings = async () => {
-    // TODO: Implement API call to save settings
+    if (!hasChanges) return;
+
     setIsSaving(true);
-    console.log("Saving settings...", {
-      profileImage: profileImagePreview,
-      displayName,
-      headline,
-      bio,
-      pronouns,
-      preferredLanguages,
-      socialLinks,
-    });
+    try {
+      // Update profile information
+      await updateUserProfile({
+        displayName,
+        headline,
+        bio,
+        pronouns,
+        preferredLanguages,
+        socialLinks,
+      });
 
-    // Mock API call delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Handle profile picture changes
+      if (croppedImageFile && profileImagePreview !== originalProfileImage) {
+        await uploadProfilePicture(croppedImageFile);
+      }
 
-    // Reset state to initial values after successful save
-    setProfileImagePreview(INITIAL_PROFILE_IMAGE);
-    setDisplayName(INITIAL_DISPLAY_NAME);
-    setHeadline(INITIAL_HEADLINE);
-    setBio(INITIAL_BIO);
-    setPronouns(INITIAL_PRONOUNS);
-    setPreferredLanguages(INITIAL_PREFERRED_LANGUAGES);
-    setSocialLinks(INITIAL_SOCIAL_LINKS);
+      // Update original values to reflect saved state
+      setOriginalDisplayName(displayName);
+      setOriginalHeadline(headline);
+      setOriginalBio(bio);
+      setOriginalPronouns(pronouns);
+      setOriginalPreferredLanguages(preferredLanguages);
+      setOriginalProfileImage(profileImagePreview);
+      setOriginalSocialLinks(socialLinks);
+      setCroppedImageFile(null);
+      setSelectedFile(null);
 
-    setIsSaving(false);
-    toast.success("Settings saved successfully!");
+      toast.success("Settings saved successfully!");
+      
+      // Refresh the page to update navbar and other components with new profile data
+      // Use setTimeout to ensure the toast is visible and data is saved
+      setTimeout(() => {
+        router.refresh();
+      }, 500);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save settings";
+      toast.error(message);
+      console.error("Failed to save settings:", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleChangePassword = () => {
-    // TODO: Implement password change API call
+  const handleChangePasswordClick = async () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert("Passwords do not match!");
+      toast.error("Passwords do not match!");
       return;
     }
-    console.log("Changing password...", {
-      currentPassword: passwordForm.currentPassword,
-      newPassword: passwordForm.newPassword,
-    });
-    // Reset form
-    setPasswordForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+      toast.error("Please fill in all password fields");
+      return;
+    }
+
+    try {
+      const result = await changePassword(
+        passwordForm.currentPassword,
+        passwordForm.newPassword
+      );
+      if (result.success) {
+        toast.success("Password changed successfully!");
+        setPasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+        // Refresh to update auth state
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to change password";
+      toast.error(message);
+    }
   };
 
   const handleDeleteAccount = async () => {
-    // TODO: Implement account deletion API call
     setIsDeleting(true);
-    console.log("Deleting account...");
-
-    // Mock API call delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Log out the user
-    setShowDeleteDialog(false);
-    setDeleteConfirmationText("");
-    setIsDeleting(false);
-    
-    // TODO: Redirect to login page after logout
-    console.log("Account deleted, logging out...");
-    toast.success("Account deleted successfully. Logging out...");
+    try {
+      const result = await deleteAccount();
+      if (result.success) {
+        toast.success("Account deleted successfully. Logging out...");
+        // Wait a moment for toast to show, then redirect
+        setTimeout(() => {
+          router.push("/login");
+        }, 1000);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to delete account";
+      toast.error(message);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setDeleteConfirmationText("");
+    }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner className="size-8" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-screen py-20">
-      <div className="w-[90vw] max-w-6xl">
+    <div className="flex justify-center h-screen overflow-y-auto">
+      <div className="w-[90vw] max-w-6xl py-20">
         {/* Floating Header */}
         <div className="mb-4 pl-2">
           <h1 className="text-3xl font-bold tracking-tight text-white">
@@ -247,7 +356,7 @@ export default function SettingsPage() {
                       src={profileImagePreview || undefined}
                       alt="Profile picture"
                     />
-                    <AvatarFallback className="text-lg">JD</AvatarFallback>
+                    <AvatarFallback className="text-lg">{(displayName || "").substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
 
                   <div className="flex flex-col gap-4">
@@ -266,16 +375,6 @@ export default function SettingsPage() {
                         <Upload />
                         Change Picture
                       </Button>
-                      {profileImagePreview && (
-                        <Button
-                          variant="destructive"
-                          className="gap-2"
-                          onClick={handleRemoveProfileImage}
-                        >
-                          <Trash2 />
-                          Remove Picture
-                        </Button>
-                      )}
                     </div>
                     <FieldDescription>
                       Photo must be at least 256x256. JPG, PNG, HEIC, or WEBP accepted.
@@ -377,7 +476,7 @@ export default function SettingsPage() {
                     </FieldDescription>
                   </FieldContent>
                   <MultiSelect
-                    options={INITIAL_PROGRAMMING_LANGUAGE_OPTIONS}
+                    options={PROGRAMMING_LANGUAGE_OPTIONS}
                     onValueChange={(values) => setPreferredLanguages(values as ProgrammingLanguage[])}
                     defaultValue={preferredLanguages}
                     placeholder="Select languages..."
@@ -469,7 +568,7 @@ export default function SettingsPage() {
                 <div className="flex justify-end w-full">
                   <div className="w-fit">
                     <Button
-                      onClick={handleChangePassword}
+                      onClick={handleChangePasswordClick}
                     >
                       <RotateCcwKey />
                       Change password
@@ -519,7 +618,18 @@ export default function SettingsPage() {
               <div className="w-[90vw] max-w-6xl">
                 <Item variant="outline" className="rounded-lg border border-border bg-card shadow-gray-950 shadow-2xl">
                   <ItemActions className="ml-auto gap-4">
-                    <Button size="lg" variant="destructive">
+                    <Button size="lg" variant="destructive" onClick={() => {
+                      // Reset to original values
+                      setDisplayName(originalDisplayName);
+                      setHeadline(originalHeadline);
+                      setBio(originalBio);
+                      setPronouns(originalPronouns);
+                      setPreferredLanguages(originalPreferredLanguages);
+                      setProfileImagePreview(originalProfileImage);
+                      setSocialLinks(originalSocialLinks);
+                      setSelectedFile(null);
+                      setCroppedImageFile(null);
+                    }}>
                       <X />Cancel
                     </Button>
                     <Button 
