@@ -16,6 +16,7 @@ const {
   verifyOtp,
   addCompletedQuestion,
   resendVerificationOtp,
+  checkUsername
 } = require('../controllers/userController');
 
 const storage = multer.memoryStorage();
@@ -34,12 +35,13 @@ const upload = multer({ storage: storage, fileFilter: fileFilter });
 // Public Routes
 router.post('/register', registerUser); 
 router.post('/login', loginUser);
-router.get('/:id', getUserProfile);
+router.get('/:username', getUserProfile);
 router.post('/forgot-password', forgotPassword);
 router.put('/reset-password', resetPassword);
 router.post('/verify-otp', verifyOtp);
 router.post('/resend-verification-otp', resendVerificationOtp);
 router.post('/profile/add-completed-question', addCompletedQuestion);
+router.post('/check-username', checkUsername);
 
 // Private Routes (Protected by middleware)
 router.put('/profile', protect, updateUserProfile);
