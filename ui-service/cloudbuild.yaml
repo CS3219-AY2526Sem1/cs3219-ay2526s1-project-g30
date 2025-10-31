@@ -1,0 +1,37 @@
+steps:
+  # Build UI Service (Next.js)
+  - id: build-ui-service
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-1-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:$COMMIT_SHA
+      - -t
+      - ${_REGION}-1-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:latest
+      - -f
+      - ui-service/Dockerfile
+      - ui-service/
+
+  # Push UI Service images
+  - id: push-ui-service
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-1-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:$COMMIT_SHA
+    waitFor: ['build-ui-service']
+
+  - id: push-ui-service-latest
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:latest
+    waitFor: ['build-ui-service']
+
+# Push UI Service images to Artifact Registry
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:$COMMIT_SHA
+  - ${_REGION}-1-docker.pkg.dev/$PROJECT_ID/peerprep/ui-service:latest
+
+# Substitutions for custom variables
+substitutions:
+  _REGION: 'asia-southeast-1'
