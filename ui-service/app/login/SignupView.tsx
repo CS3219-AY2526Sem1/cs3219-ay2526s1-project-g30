@@ -232,7 +232,9 @@ export function SignupView({
           className="w-full"
           disabled={!isFormValid || isSigningUp}
         >
-          <ArrowRight /> Sign up
+          {isSigningUp && <Spinner />}
+          {isSigningUp ? 'Signing up...' : 'Sign up'}
+          {!isSigningUp && <ArrowRight />}
         </Button>
 
         <Button

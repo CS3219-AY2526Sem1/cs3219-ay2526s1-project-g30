@@ -6,6 +6,7 @@ import { ViewContent } from '@/components/ViewContent';
 import { ArrowRight } from 'lucide-react';
 import { Field, FieldContent, FieldLabel, FieldError, FieldGroup } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { validateEmail } from '@/lib/validation';
 
 interface EmailEntryViewProps {
@@ -14,6 +15,7 @@ interface EmailEntryViewProps {
   onEmailChange: (email: string) => void;
   onContinue: () => void;
   onSignUpClick: () => void;
+  isLoading?: boolean;
 }
 
 export function EmailEntryView({
@@ -22,13 +24,14 @@ export function EmailEntryView({
   onEmailChange,
   onContinue,
   onSignUpClick,
+  isLoading = false,
 }: EmailEntryViewProps) {
   const emailValidation = useMemo(() => {
     if (!emailInput) return { isValid: true };
     return { isValid: validateEmail(emailInput) };
   }, [emailInput]);
 
-  const isContinueDisabled = !emailInput || !emailValidation.isValid;
+  const isContinueDisabled = !emailInput || !emailValidation.isValid || isLoading;
 
   const handleEmailKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !isContinueDisabled) {
@@ -76,7 +79,9 @@ export function EmailEntryView({
           className="w-full"
           disabled={isContinueDisabled}
         >
-          <ArrowRight /> Continue
+          {isLoading && <Spinner />}
+          {isLoading ? 'Loading...' : 'Continue'}
+          {!isLoading && <ArrowRight />}
         </Button>
       </div>
 
