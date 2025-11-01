@@ -58,17 +58,17 @@ substitutions:
 
 availableSecrets:
   secretManager:
-  - versionName: projects/cs3219-peerprep-g30/secrets/session-secret/versions/latest
+  - versionName: projects/cs3219-peerprep-g30/secrets/SESSION_SECRET/versions/latest
     env: 'SESSION_SECRET'
-  - versionName: projects/cs3219-peerprep-g30/secrets/next-public-user-service-url/versions/latest
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_USER_SERVICE_URL/versions/latest
     env: 'NEXT_PUBLIC_USER_SERVICE_URL'
-  - versionName: projects/cs3219-peerprep-g30/secrets/next-public-matching-service-url/versions/latest
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_MATCHING_SERVICE_URL/versions/latest
     env: 'NEXT_PUBLIC_MATCHING_SERVICE_URL'
-  - versionName: projects/cs3219-peerprep-g30/secrets/next-public-question-service-url/versions/latest
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_QUESTION_SERVICE_URL/versions/latest
     env: 'NEXT_PUBLIC_QUESTION_SERVICE_URL'
-  - versionName: projects/cs3219-peerprep-g30/secrets/next-public-collab-service-url/versions/latest
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_COLLAB_SERVICE_URL/versions/latest
     env: 'NEXT_PUBLIC_COLLAB_SERVICE_URL'
-  - versionName: projects/cs3219-peerprep-g30/secrets/next-public-collab-service-ws-url/versions/latest
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_COLLAB_SERVICE_WS_URL/versions/latest
     env: 'NEXT_PUBLIC_COLLAB_SERVICE_WS_URL'
 
 tags:
