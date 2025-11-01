@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useTransition } from 'react';
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -42,7 +42,7 @@ export function SignupView({
   onLogInClick,
 }: SignupViewProps) {
   const [state, formAction, isSigningUp] = useActionState(signUp, undefined);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   // Watch for successful signup and trigger callback
   useEffect(() => {

@@ -29,7 +29,8 @@ export function validateUsername(username: string): {
     return { isValid: false, errorMessage: 'Username must be at most 32 characters' };
   }
 
-const usernameRegex = /^[a-zA-Z0-9._-]+$/;
+  const usernameRegex = /^[a-zA-Z0-9._-]+$/;
+  
   if (!usernameRegex.test(username)) {
     return { isValid: false, errorMessage: 'Username can only contain letters, numbers, periods, dashes, and underscores' };
   }

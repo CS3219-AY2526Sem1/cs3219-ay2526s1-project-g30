@@ -73,16 +73,6 @@ function isAuthRoute(pathname: string): boolean {
 }
 
 /**
- * Checks if a route is public (doesn't require authentication).
- *
- * @param pathname The request pathname
- * @returns True if the route is public
- */
-function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
-}
-
-/**
  * Authentication Proxy Function
  *
  * Handles:

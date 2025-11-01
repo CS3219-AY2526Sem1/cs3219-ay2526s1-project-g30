@@ -29,7 +29,7 @@ export function ResetPasswordView({
 }: ResetPasswordViewProps) {
   const [resetState, resetFormAction, isResettingPassword] = useActionState(resetPassword, undefined);
   const [resendState, resendFormAction, isResendingOtp] = useActionState(requestPasswordReset, undefined);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   
   const [otpValue, setOtpValue] = useState<string>('');
   const [newPasswordInput, setNewPasswordInput] = useState<string>('');

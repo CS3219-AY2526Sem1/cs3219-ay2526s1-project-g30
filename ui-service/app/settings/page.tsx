@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -83,7 +82,7 @@ export default function SettingsPage() {
   const [originalBio, setOriginalBio] = useState("");
 
   // Pronouns
-  const [pronounOptions, setPronounOptions] = useState<MultiSelectOption[]>(PRONOUNS_OPTIONS);
+  const [pronounOptions] = useState<MultiSelectOption[]>(PRONOUNS_OPTIONS);
   const [pronouns, setPronouns] = useState<string[]>([]);
   const [originalPronouns, setOriginalPronouns] = useState<string[]>([]);
 
@@ -202,11 +201,6 @@ export default function SettingsPage() {
     
     setShowCropDialog(false);
     setSelectedFile(null);
-  };
-
-  const handleRemoveProfileImage = () => {
-    setProfileImagePreview(null);
-    setCroppedImageFile(null);
   };
 
   const handlePasswordChange = (field: keyof typeof passwordForm, value: string) => {

@@ -40,8 +40,6 @@ export function QuestionPanel({
   constraints = [],
   textSize = 14,
 }: QuestionPanelProps) {
-  const baseFontSize = textSize / 14 // 14px is our base
-
   return (
     <ScrollArea className="h-full w-full bg-background text-foreground">
       <div className="p-6 space-y-6">

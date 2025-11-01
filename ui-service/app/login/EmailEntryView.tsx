@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ViewContent } from '@/components/ViewContent';
 import { ArrowRight } from 'lucide-react';

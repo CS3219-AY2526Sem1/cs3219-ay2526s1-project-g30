@@ -20,7 +20,6 @@ import {
   ArrowLeftRight,
   Columns2,
   Rows2,
-  Type,
   ChevronDown,
   Undo,
   Redo,

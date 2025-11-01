@@ -29,7 +29,7 @@ export function SignupCompleteView({
   onBack,
 }: SignupCompleteViewProps) {
   const [state, formAction, isSubmitting] = useActionState(updateUserProfile, undefined);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [displayNameInput, setDisplayNameInput] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<ProgrammingLanguage | undefined>();
   const [experienceSliderValue, setExperienceSliderValue] = useState<number[]>([0]);

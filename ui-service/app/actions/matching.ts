@@ -26,7 +26,6 @@
 
 'use server';
 
-import { redirect } from 'next/navigation';
 import { requireAuth } from '@/lib/dal';
 import { config } from '@/lib/config';
 import { requestMatch, MatchingServiceError } from '@/lib/matchingServiceClient';

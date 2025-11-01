@@ -1,7 +1,6 @@
 'use client';
 
 import { useActionState, useTransition } from 'react';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -31,7 +30,7 @@ export function PasswordAuthView({
   onBack,
 }: PasswordAuthViewProps) {
   const [state, formAction, isSubmitting] = useActionState(signIn, undefined);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   // Display error from server action state
   const signInError = state && !state.success ? state.message : undefined;

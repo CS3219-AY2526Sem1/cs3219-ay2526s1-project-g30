@@ -27,7 +27,7 @@ export function OtpVerificationView({
   onBack,
 }: OtpVerificationViewProps) {
   const [state, formAction, isVerifying] = useActionState(verifyOTP, undefined);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [otpValue, setOtpValue] = useState<string>('');
 
   const handleVerifyOtp = async () => {

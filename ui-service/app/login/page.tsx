@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { signUp, signIn, verifyOTP, requestPasswordReset, resetPassword } from '@/app/actions/auth';
 import { EmailEntryView } from './EmailEntryView';
 import { PasswordAuthView } from './PasswordAuthView';
 import { SignupView } from './SignupView';
@@ -24,7 +23,6 @@ export default function LoginPage() {
   const [signupPassword, setSignupPassword] = useState<string>('');
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState<string>('');
   const [storedPassword, setStoredPassword] = useState<string>('');
-  const [isResetPasswordFlow, setIsResetPasswordFlow] = useState(false);
 
   const handleContinueEmail = () => {
     if (emailInput.trim()) {
