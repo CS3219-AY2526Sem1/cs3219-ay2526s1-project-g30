@@ -1,0 +1,19 @@
+# .dockerignore
+
+# Ignore dependencies (these are installed inside the container)
+node_modules
+
+# Ignore Git directory
+.git
+
+# Ignore local environment variables
+.env
+
+# Ignore Docker related files if they are in the context
+Dockerfile
+
+# Add any other files or folders you don't need in the image build
+npm-debug.log
+
+# Ignore the folder containing locally uploaded files (for development)
+uploads/
