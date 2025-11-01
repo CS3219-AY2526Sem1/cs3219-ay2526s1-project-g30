@@ -22,7 +22,7 @@ steps:
       - '-f'
       - ui-service/Dockerfile
     id: Build
-    secretEnv: ['SESSION_SECRET', 'NEXT_PUBLIC_USER_SERVICE_URL', 'NEXT_PUBLIC_MATCHING_SERVICE_URL', 'NEXT_PUBLIC_QUESTION_SERVICE_URL', 'NEXT_PUBLIC_COLLAB_SERVICE_URL', 'NEXT_PUBLIC_COLLAB_SERVICE_WS_URL']
+    secretEnv: ['_SESSION_SECRET', '_NEXT_PUBLIC_USER_SERVICE_URL', '_NEXT_PUBLIC_MATCHING_SERVICE_URL', '_NEXT_PUBLIC_QUESTION_SERVICE_URL', '_NEXT_PUBLIC_COLLAB_SERVICE_URL', '_NEXT_PUBLIC_COLLAB_SERVICE_WS_URL']
   - name: gcr.io/cloud-builders/docker
     args:
       - push
@@ -61,14 +61,9 @@ substitutions:
   _PLATFORM: managed
   _SERVICE_NAME: cs3219-ay2526s1-project-g30
   _TRIGGER_ID: 75ef2963-cd0e-4a56-892c-3ad1d15067be
-  _SESSION_SECRET: 'session-secret'
-  _NEXT_PUBLIC_USER_SERVICE_URL: 'next-public-user-service-url'
-  _NEXT_PUBLIC_MATCHING_SERVICE_URL: 'next-public-matching-service-url'
-  _NEXT_PUBLIC_QUESTION_SERVICE_URL: 'next-public-question-service-url'
-  _NEXT_PUBLIC_COLLAB_SERVICE_URL: 'next-public-collab-service-url'
-  _NEXT_PUBLIC_COLLAB_SERVICE_WS_URL: 'next-public-collab-service-ws-url'
 
-secrets:
+availableSecrets:
+  secretManager:
   - versionName: projects/cs3219-peerprep-g30/secrets/session-secret/versions/latest
     env: '_SESSION_SECRET'
   - versionName: projects/cs3219-peerprep-g30/secrets/next-public-user-service-url/versions/latest
