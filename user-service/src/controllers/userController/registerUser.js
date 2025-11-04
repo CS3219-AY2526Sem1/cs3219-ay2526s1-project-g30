@@ -3,6 +3,7 @@ const sendEmail = require('../../utils/sendEmail');
 
 const registerUser = async (req, res) => {
   const { username, email, password } = req.body;
+  
   let user;
 
   try {
@@ -20,34 +21,31 @@ const registerUser = async (req, res) => {
       profilePictureUrl: defaultProfilePic,
     });
 
-    const verificationToken = crypto.randomBytes(20).toString('hex');
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    user.emailVerificationToken = crypto
-      .createHash('sha256')
-      .update(verificationToken)
-      .digest('hex');
-    
-    user.emailVerificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
-    
+    user.emailVerificationOtp = otp;
+    user.emailVerificationOtpExpires = Date.now() + 15 * 60 * 1000; 
+ 
     await user.save({ validateBeforeSave: false });
 
-    const verificationUrl = `${req.protocol}://${req.get('host')}/api/users/verify-email/${verificationToken}`;
-    const message = `Welcome to PeerPrep! Please click the following link to verify your email address. This link is valid for 24 hours.\n\n${verificationUrl}`;
+    const message = `Welcome to PeerPrep! Your verification code is: ${otp}\n\nThis code is valid for 15 minutes. Please enter it in the application to verify your email address.`;
     
     await sendEmail({
       email: user.email,
-      subject: 'Verify Your PeerPrep Email Address',
+      subject: 'Your PeerPrep Email Verification Code',
       message,
     });
 
     res.status(201).json({
-      message: 'Registration successful! Please check your email to verify your account.',
-      userId: user._id
+      message: 'Registration successful! Please check your email for your verification code.',
+      userId: user._id 
     });
 
   } catch (err) {
     console.error(err);
 
+    // If email sending failed *after* the user was created,
+    // delete the partial user so they can try again.
     if (user && user._id) {
       console.log('Cleaning up partially created user...');
       await User.deleteOne({ _id: user._id });

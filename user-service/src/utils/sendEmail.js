@@ -6,9 +6,7 @@ const sendEmail = async (options) => {
     to: options.email,
     from: 'peerprepg30@gmail.com', 
     subject: options.subject,
-    text: options.message,
-    // You can also add an HTML version
-    // html: `<strong>${options.message}</strong>`, 
+    text: options.message, 
   };
 
   try {
