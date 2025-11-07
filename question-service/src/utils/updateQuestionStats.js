@@ -2,8 +2,9 @@ import Question from "../models/question.model.js";
 import QuestionStats from "../models/questionStats.model.js";
 
 export async function recalcQuestionStats() {
-    // Aggregate all category-difficulty combinations
+    // Unwind category so each category value is treated separately, then group by category+difficulty
     const stats = await Question.aggregate([
+        { $unwind: { path: "$category", preserveNullAndEmptyArrays: false } },
         {
             $group: {
                 _id: { category: "$category", difficulty: "$difficulty" },
@@ -12,8 +13,10 @@ export async function recalcQuestionStats() {
         }
     ]);
 
-    // Build formatted structures
-    const categories = [...new Set(stats.map(s => s._id.category))];
+    // Unique list of categories as strings
+    const categories = Array.from(new Set(stats.map(s => String(s._id.category))));
+
+    // Build difficultyCounts per category
     const difficultyCounts = {};
     for (const s of stats) {
         const { category, difficulty } = s._id;
@@ -21,10 +24,10 @@ export async function recalcQuestionStats() {
         difficultyCounts[category][difficulty] = s.count;
     }
 
-    // update or insert single stats document
+    // Use $set to update fields (avoids replacement/casting issues) and upsert if missing
     await QuestionStats.updateOne(
         { _id: "questionStats" },
-        { categories, difficultyCounts, updatedAt: new Date() },
+        { $set: { categories, difficultyCounts, updatedAt: new Date() } },
         { upsert: true }
     );
 }
