@@ -19,6 +19,7 @@ import (
 type MatchingService struct {
 	mutex       sync.Mutex
 	waitingPool map[string][]*WaitingUser // CHANGED: value is now a slice of pointers
+	userIndex   map[string]*WaitingUser
 	matcher     Matcher
 }
 
@@ -26,6 +27,7 @@ type MatchingService struct {
 func NewMatchingService(matcher Matcher) *MatchingService {
 	return &MatchingService{
 		waitingPool: make(map[string][]*WaitingUser),
+		userIndex:   make(map[string]*WaitingUser),
 		matcher:     matcher,
 	}
 }
@@ -117,6 +119,37 @@ func informCollaborationService(payload CollaborationRequest) error {
 	return nil
 }
 
+func (s *MatchingService) CancelMatchRequest(userID string) bool {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	user, found := s.userIndex[userID]
+	if !found {
+		log.Warn().Str("userId", userID).Msg("User tried to cancel, but was not in the pool.")
+		return false
+	}
+
+	delete(s.userIndex, userID)
+
+	key := createMatchKey(user.Info.Difficulty, user.Info.Topic)
+	if users, found := s.waitingPool[key]; found {
+		for i, u := range users {
+			if u.Info.UserID == userID {
+				s.waitingPool[key][i] = s.waitingPool[key][len(users)-1]
+				s.waitingPool[key] = s.waitingPool[key][:len(users)-1]
+
+				log.Info().Str("userId", userID).Str("key", key).Msg("User successfully canceled and removed from pool.")
+
+				user.NotifyChan <- MatchResult{} // NOTE: will cause 408
+				return true
+			}
+		}
+	}
+
+	log.Error().Str("userId", userID).Msg("CRITICAL: User was in userIndex but not in waitingPool. State was inconsistent.")
+	return false
+}
+
 func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult {
 	resultChan := make(chan MatchResult, 1)
 
@@ -141,6 +174,7 @@ func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult
 					break
 				}
 			}
+			delete(s.userIndex, opponent.Info.UserID)
 			s.mutex.Unlock()
 
 			questionID, err := getQuestionFromService(req.Difficulty, req.Topic, req.UserID, opponent.Info.UserID)
@@ -182,6 +216,7 @@ func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult
 		// If no match was found, add the current user to the waiting slice.
 		log.Info().Str("userId", newUser.Info.UserID).Str("key", key).Msg("User added to the waiting pool")
 		s.waitingPool[key] = append(s.waitingPool[key], newUser)
+		s.userIndex[newUser.Info.UserID] = newUser
 		s.mutex.Unlock()
 
 		select {
@@ -196,6 +231,7 @@ func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult
 				for i, user := range users {
 					if user.Info.UserID == req.UserID {
 						s.waitingPool[key_timeout] = append(users[:i], users[i+1:]...)
+						delete(s.userIndex, req.UserID)
 						log.Info().Str("userId", req.UserID).Msg("User timed out and was removed from the pool.")
 						resultChan <- MatchResult{}
 						break
