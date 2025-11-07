@@ -23,6 +23,7 @@ func main() {
 
 	router := gin.Default()
 	router.POST("/api/v1/match", createMatchHandler(service))
+	router.POST("/api/v1/cancel", createCancelHandler(service))
 
 	port := os.Getenv("PORT")
 	if port == "" {
