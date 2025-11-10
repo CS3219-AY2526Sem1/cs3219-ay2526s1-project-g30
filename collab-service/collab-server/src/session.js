@@ -5,6 +5,8 @@ export class Session {
         this.sessionId = sessionId
         this.user1 = userId1
         this.user2 = userId2
+        this.user1name = ''
+        this.user2name = ''
         this.language = language
         this.question = question
         this.startTime = start
