@@ -168,10 +168,10 @@ async function handleCreateSession(req, res) {
       const [questionResult, templateResult, validUser1, validUser2] = await Promise.all([
         fetchQuestion(question, programmingLang),
         dbTemplates.findOne({ programmingLanguage: programmingLang }),
-        validateUser(user1),
-        validateUser(user2)])
+        validateUser(user1, newSession),
+        validateUser(user2, newSession)])
 
-      if (!questionResult.signature || !templateResult?.template || user1 === user2) {
+      if (!questionResult.signature || !templateResult?.template || !validUser1 || !validUser2 || user1 === user2) {
         throw new Error("Invalid parameters")
       }
       // if (!questionResult.signature) {
@@ -304,7 +304,7 @@ async function endSession(session, reason) {
   console.log('Ending session:', session.sessionId)
   try {
     session.endSession(reason)
-    // Send PUT Request to User service
+    // Send POST Request to User service
     const dataUser1 = {
       userId: session.user1,
       questionId: session.question
@@ -366,8 +366,6 @@ async function endSession(session, reason) {
       throw new Error('Failed to update database')
     }
 
-    
-
     // remove Session from Sessions map
     sessions.delete(session.sessionId)
     console.log('Successfully ended session:', session.sessionId)
@@ -379,14 +377,22 @@ async function endSession(session, reason) {
 }
 
 // Validate a user
-async function validateUser(userId) {
+async function validateUser(userId, session) {
   try {
-    const response = await fetch(userService + 'api/users/' + userId, {
+    const response = await fetch(userService + 'api/users/check-id/' + userId, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-      }
+      },
     })
+    const res = await response.json()
+    if (response.status === 200) {
+      if (session.user1 === userId) {
+        session.user1name = res.username
+      } else if (session.user2 === userId) {
+        session.user2name = res.username
+      }
+    }
     return response.status === 200
   } catch (e) {
     console.error('Error validating user', userId, ':', e)
@@ -417,20 +423,28 @@ docWss.on('connection', setupWSConnection)
 const chatWss = new WebSocket.Server({ noServer: true, port: 8889 })
 
 // When websocket tries to connect for chat
-chatWss.on('connection', async (ws, req, userid) => {
-  const sessionId = (req.url || '').slice(1).split('?')[0]
+chatWss.on('connection', async (ws, req) => {
+  const parsedURL = new URL((process.env.SERVER_URL || '') + req.url)
+  const sessionId = (parsedURL.pathname || '').slice(1)
+  const userid = parsedURL.searchParams.get('userid') || ''
+
   // Get the session
   const session = sessions.get(sessionId)
   if (!session) {
     ws.close(4001, 'Session does not exist or has ended');
     return
   }
-  
+  let username
+  if (session.user1 === userid) {
+    username = session.user1name
+  } else if (session.user2 === userid) {
+    username = session.user2name
+  }
   if (session.isUserChatDc(userid)) {
     const otherUserWs = session.getOtherUserConnections(userid)
     const broadcastData = {
         type: 'ChatNotif',
-        content: userid + " has joined the chat"
+        content: username + " has joined the chat"
     }
     broadcastToConns(otherUserWs, broadcastData)
   }
@@ -446,17 +460,23 @@ chatWss.on('connection', async (ws, req, userid) => {
   }));
 
   ws.on('message', async (message) => {
-    const data = JSON.parse(message)
-    if (data.type === 'SendMsg') {
-      const content = data.content
-      const broadcastData = {
-          type: 'ChatMessage',
-          userid: userid,
-          content: content
+    try {
+      const data = JSON.parse(message)
+      if (data.type === 'SendMsg') {
+        const content = data.content
+        const broadcastData = {
+            type: 'ChatMessage',
+            username: username,
+            content: content
+        }
+        const conns = session.getAllChatConnections()
+        broadcastToConns(conns, broadcastData)
       }
-      const conns = session.getAllChatConnections()
-      broadcastToConns(conns, broadcastData)
+    } catch (e) {
+      console.log(`Caught error for`, sessionId)
+      console.log(e)
     }
+    
   })
 
   ws.on('close', () => {
@@ -467,7 +487,7 @@ chatWss.on('connection', async (ws, req, userid) => {
         const otherUserWs = session.getOtherUserConnections(userid)
         const broadcastData = {
             type: 'ChatNotif',
-            content: userid + " has left the chat"
+            content: username + " has left the chat"
         }
         broadcastToConns(otherUserWs, broadcastData)
       }
@@ -512,7 +532,7 @@ server.on('upgrade', async (request, socket, head) => {
     }
     else if (purpose == 'chat') {
       chatWss.handleUpgrade(request, socket, head, /** @param {any} ws */ ws => {
-        chatWss.emit('connection', ws, request, userid)
+        chatWss.emit('connection', ws, request)
         console.log(userid, 'joined chat for ', sessionId)
       })
     }
