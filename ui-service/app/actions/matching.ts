@@ -30,6 +30,7 @@ import { requireAuth } from '@/lib/dal';
 import { config } from '@/lib/config';
 import { requestMatch, MatchingServiceError } from '@/lib/matchingServiceClient';
 import type { FormState } from '@/types/auth';
+import type { Question } from '@/lib/questionServiceClient';
 import {
   logServerActionStart,
   logServerActionSuccess,
@@ -376,6 +377,31 @@ export async function terminateCollaborativeSession(
       userId,
     });
 
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Server Action to fetch a question by ID.
+ * 
+ * This wraps the question service client in a Server Action so that
+ * the client component can safely fetch questions without directly importing
+ * the server-only questionServiceClient module.
+ */
+export async function fetchQuestionAction(questionId: string): Promise<{ success: boolean; data?: Question; error?: string }> {
+  try {
+    const { fetchQuestion } = await import('@/lib/questionServiceClient');
+    const question = await fetchQuestion(questionId);
+    return {
+      success: true,
+      data: question,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch question';
+    logServiceError('questionService', `/api/questions/${questionId}`, error);
     return {
       success: false,
       error: errorMessage,

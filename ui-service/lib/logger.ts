@@ -22,6 +22,7 @@ const LOG_PREFIX = {
   matching: '[Matching]',
   userService: '[User Service]',
   matchingService: '[Matching Service]',
+  questionService: '[Question Service]',
   profile: '[Profile]',
   checkUsername: '[Check Username]',
 };

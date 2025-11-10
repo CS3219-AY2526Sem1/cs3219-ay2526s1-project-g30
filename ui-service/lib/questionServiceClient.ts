@@ -5,6 +5,8 @@
  * which handles fetching interview questions by ID or by criteria.
  */
 
+import 'server-only';
+
 import { config } from './config';
 import { logOutgoingRequest, logIncomingResponse, logServiceError, logTiming } from './logger';
 

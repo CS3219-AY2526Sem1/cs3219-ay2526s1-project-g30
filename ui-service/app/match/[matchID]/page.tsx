@@ -13,9 +13,9 @@ import {
 } from '@/components/ui/resizable'
 import { EndSessionDialog } from '@/components/EndSessionDialog'
 import { Spinner } from '@/components/ui/spinner'
-import { fetchQuestion, type Question } from '@/lib/questionServiceClient'
+import type { Question } from '@/lib/questionServiceClient'
 import { setupYJS } from '@/lib/yjs-setup'
-import { getCurrentSessionUser, terminateCollaborativeSession } from '@/app/actions/matching'
+import { getCurrentSessionUser, terminateCollaborativeSession, fetchQuestionAction } from '@/app/actions/matching'
 import { toast } from 'sonner'
 
 // Map programming language names from matching service to Monaco editor language IDs
@@ -127,11 +127,16 @@ export default function MatchPage({ params }: MatchPageProps) {
       })
 
       try {
-        const questionData = await fetchQuestion(questionId!)
-        setQuestion(questionData)
+        const result = await fetchQuestionAction(questionId!)
+        
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Failed to fetch question')
+        }
+
+        setQuestion(result.data)
         console.log('[Match Page] Question loaded successfully:', {
-          title: questionData.title,
-          difficulty: questionData.difficulty,
+          title: result.data.title,
+          difficulty: result.data.difficulty,
         })
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to load question'
