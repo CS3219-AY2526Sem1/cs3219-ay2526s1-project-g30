@@ -7,7 +7,8 @@ const router = express.Router();
 
 // helper function to create a case-insensitive regex filter
 function caseInsensitiveFilter(value) {
-    return { $regex: `^${value}$`, $options: 'i' };
+    const escapedValue = RegExp.escape(value);
+    return { $regex: `^${escapedValue}$`, $options: 'i' };
 }
 
 // get a random question by difficulty and category, avoid duplicates for user completed qns
