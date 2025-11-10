@@ -29,7 +29,7 @@
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import * as userServiceClient from '@/lib/userServiceClient';
-import { createSession, deleteSession, generateAuthToken } from '@/lib/session';
+import { createSession, deleteSession, generateAuthToken, markProfileComplete } from '@/lib/session';
 import { verifyAuth, requireAuth, getSessionUserInfo, getSessionJWTToken } from '@/lib/dal';
 import {
   registerSchema,
@@ -246,7 +246,8 @@ export async function signIn(
       const username = email.split('@')[0];
 
       // Create session with the JWT token from user-service
-      await createSession(response.userId, email, username, response.token);
+      // Existing users have already completed their profile setup
+      await createSession(response.userId, email, username, response.token, true);
 
       logServerActionSuccess('signIn', {
         userId: response.userId,
@@ -909,6 +910,9 @@ export async function updateUserProfile(
       userId: session.userId,
       timestamp: new Date().toISOString(),
     });
+
+    // Mark profile as complete in the session
+    await markProfileComplete();
 
     logServerActionSuccess('updateUserProfile', {
       userId: session.userId,
