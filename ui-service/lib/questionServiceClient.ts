@@ -6,6 +6,7 @@
  */
 
 import { config } from './config';
+import { logOutgoingRequest, logIncomingResponse, logServiceError, logTiming } from './logger';
 
 export class QuestionServiceError extends Error {
   constructor(
@@ -45,10 +46,10 @@ export interface Question {
  */
 export async function fetchQuestion(questionId: string): Promise<Question> {
   const url = `${config.questionService.baseUrl}/${questionId}`;
+  const startTime = Date.now();
 
-  console.log('[Question Service] Fetching question:', {
+  logOutgoingRequest('userService', `/${questionId}`, 'GET', {
     questionId,
-    url,
     timestamp: new Date().toISOString(),
   });
 
@@ -66,22 +67,26 @@ export async function fetchQuestion(questionId: string): Promise<Question> {
 
     clearTimeout(timeoutId);
 
-    console.log('[Question Service] Response received:', {
-      status: response.status,
-      statusText: response.statusText,
-      questionId,
-    });
+    const durationMilliseconds = Date.now() - startTime;
 
     if (!response.ok) {
+      logIncomingResponse('userService', `/${questionId}`, response.status, {
+        durationMilliseconds,
+        questionId,
+        timestamp: new Date().toISOString(),
+      });
+
       if (response.status === 404) {
-        console.error('[Question Service] Question not found:', questionId);
+        logServiceError('userService', `/${questionId}`, new Error(`Question not found: ${questionId}`), {
+          statusCode: 404,
+          questionId,
+        });
         throw new QuestionServiceError(404, `Question not found: ${questionId}`);
       }
 
       const errorData = await response.json().catch(() => ({}));
-      console.error('[Question Service] Error response:', {
-        status: response.status,
-        errorData,
+      logServiceError('userService', `/${questionId}`, new Error(errorData.message || 'Question service error'), {
+        statusCode: response.status,
         questionId,
       });
       throw new QuestionServiceError(
@@ -91,11 +96,19 @@ export async function fetchQuestion(questionId: string): Promise<Question> {
     }
 
     const data: Question = await response.json();
-    console.log('[Question Service] Question fetched successfully:', {
+
+    logIncomingResponse('userService', `/${questionId}`, response.status, {
+      durationMilliseconds,
       questionId: data._id,
       title: data.title,
       difficulty: data.difficulty,
+      timestamp: new Date().toISOString(),
     });
+
+    logTiming(`userService GET /${questionId}`, durationMilliseconds, {
+      questionId,
+    });
+
     return data;
   } catch (error) {
     clearTimeout(timeoutId);
@@ -105,21 +118,27 @@ export async function fetchQuestion(questionId: string): Promise<Question> {
     }
 
     if (error instanceof Error && error.name === 'AbortError') {
-      console.error('[Question Service] Request timeout:', questionId);
+      logServiceError('userService', `/${questionId}`, error, {
+        statusCode: 408,
+        questionId,
+        errorType: 'timeout',
+      });
       throw new QuestionServiceError(408, 'Question service request timeout');
     }
 
     if (error instanceof TypeError) {
-      console.error('[Question Service] Network error:', {
-        message: error.message,
+      logServiceError('userService', `/${questionId}`, error, {
+        statusCode: 0,
         questionId,
+        errorType: 'network',
       });
       throw new QuestionServiceError(0, `Network error: ${error.message}`);
     }
 
-    console.error('[Question Service] Unknown error:', {
-      error,
+    logServiceError('userService', `/${questionId}`, error, {
+      statusCode: 500,
       questionId,
+      errorType: 'unknown',
     });
     throw new QuestionServiceError(500, 'Unknown error while fetching question');
   }
@@ -142,12 +161,20 @@ export async function fetchRandomQuestion(
     params.append('category', category);
   }
 
-  const url = `${config.questionService.baseUrl}/randomQuestion?${params.toString()}`;
+  const endpoint = `/randomQuestion?${params.toString()}`;
+  const startTime = Date.now();
+
+  logOutgoingRequest('userService', endpoint, 'GET', {
+    difficulty,
+    category,
+    timestamp: new Date().toISOString(),
+  });
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), config.questionService.timeout);
 
   try {
+    const url = `${config.questionService.baseUrl}${endpoint}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -158,12 +185,31 @@ export async function fetchRandomQuestion(
 
     clearTimeout(timeoutId);
 
+    const durationMilliseconds = Date.now() - startTime;
+
     if (!response.ok) {
+      logIncomingResponse('userService', endpoint, response.status, {
+        durationMilliseconds,
+        difficulty,
+        category,
+        timestamp: new Date().toISOString(),
+      });
+
       if (response.status === 404) {
+        logServiceError('userService', endpoint, new Error('No questions found matching criteria'), {
+          statusCode: 404,
+          difficulty,
+          category,
+        });
         throw new QuestionServiceError(404, 'No questions found matching criteria');
       }
 
       const errorData = await response.json().catch(() => ({}));
+      logServiceError('userService', endpoint, new Error(errorData.message || 'Question service error'), {
+        statusCode: response.status,
+        difficulty,
+        category,
+      });
       throw new QuestionServiceError(
         response.status,
         errorData.message || 'Question service error'
@@ -171,6 +217,19 @@ export async function fetchRandomQuestion(
     }
 
     const data: { id: string } = await response.json();
+
+    logIncomingResponse('userService', endpoint, response.status, {
+      durationMilliseconds,
+      difficulty,
+      category,
+      questionId: data.id,
+      timestamp: new Date().toISOString(),
+    });
+
+    logTiming(`userService GET ${endpoint}`, durationMilliseconds, {
+      difficulty,
+    });
+
     return data;
   } catch (error) {
     clearTimeout(timeoutId);
@@ -180,13 +239,31 @@ export async function fetchRandomQuestion(
     }
 
     if (error instanceof Error && error.name === 'AbortError') {
+      logServiceError('userService', endpoint, error, {
+        statusCode: 408,
+        difficulty,
+        category,
+        errorType: 'timeout',
+      });
       throw new QuestionServiceError(408, 'Question service request timeout');
     }
 
     if (error instanceof TypeError) {
+      logServiceError('userService', endpoint, error, {
+        statusCode: 0,
+        difficulty,
+        category,
+        errorType: 'network',
+      });
       throw new QuestionServiceError(0, `Network error: ${error.message}`);
     }
 
+    logServiceError('userService', endpoint, error, {
+      statusCode: 500,
+      difficulty,
+      category,
+      errorType: 'unknown',
+    });
     throw new QuestionServiceError(500, 'Unknown error while fetching random question');
   }
 }
