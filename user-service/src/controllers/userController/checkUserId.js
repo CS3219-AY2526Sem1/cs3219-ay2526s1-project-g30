@@ -2,18 +2,14 @@ const User = require('../../models/User');
 const mongoose = require('mongoose'); 
 
 const checkUserId = async (req, res) => {
-  const { userId } = req.body;
+  const { id } = req.params;
 
-  if (!userId) {
-    return res.status(400).json({ message: 'User ID is required.' });
-  }
-
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: 'Invalid ID format.' });
   }
 
   try {
-    const user = await User.findById(userId).select('username');
+    const user = await User.findById(id).select('username');
 
     if (user) {
       return res.status(200).json({ username: user.username });

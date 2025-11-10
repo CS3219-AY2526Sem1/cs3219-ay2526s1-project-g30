@@ -42,7 +42,7 @@ router.post('/verify-otp', verifyOtp);
 router.post('/resend-verification-otp', resendVerificationOtp);
 router.post('/profile/add-completed-question', addCompletedQuestion);
 router.post('/check-username', checkUsername);
-router.post('/check-id', checkUserId);
+router.get('/check-id/:id', checkUserId);
 
 // Private Routes (Protected by middleware)
 router.put('/profile', protect, updateUserProfile);
