@@ -1,4 +1,3 @@
-// utils/generateSignature.js
 export function generateFunctionTemplate(question, lang) {
     const { function_name, function_params, function_return } = question;
 

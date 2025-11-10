@@ -168,6 +168,35 @@ router.post('/', async (req, res) => {
     }
 });
 
+// batch insert multiple questions
+router.post('/batch', async (req, res) => {
+    try {
+        const questions = req.body;
+
+        if (!Array.isArray(questions) || questions.length === 0) {
+            return res.status(400).json({ message: "Request body must be a non-empty array of questions" });
+        }
+
+        // Normalize category field: ensure every question uses an array
+        const normalizedQuestions = questions.map(q => ({
+            ...q,
+            category: Array.isArray(q.category) ? q.category : [q.category]
+        }));
+
+        // Insert all questions at once
+        const insertedQuestions = await Question.insertMany(normalizedQuestions, { ordered: false });
+
+        res.status(201).json({
+            message: `${insertedQuestions.length} questions inserted successfully`,
+            insertedIds: insertedQuestions.map(q => q._id)
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // edit a single question by ID
 router.patch('/edit/:id', async (req, res) => {
     try {
