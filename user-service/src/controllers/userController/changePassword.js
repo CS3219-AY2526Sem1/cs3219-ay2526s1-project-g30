@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 const changePassword = async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
-  // New password cannot be the same as current
   if (currentPassword === newPassword) {
     return res.status(400).json({ message: 'New password cannot be the same as the current password.' });
   }

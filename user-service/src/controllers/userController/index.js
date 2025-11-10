@@ -12,4 +12,5 @@ module.exports = {
   verifyOtp: require('./verifyOtp'),
   resendVerificationOtp: require('./resendVerificationOtp'),
   checkUsername: require('./checkUsername'),
+  checkUserId: require('./checkUserId')
 }; 
