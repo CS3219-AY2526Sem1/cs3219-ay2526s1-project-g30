@@ -32,10 +32,8 @@ const uploadProfilePicture = async (req, res) => {
     });
 
     blobStream.on('finish', async () => {
-      // Construct the public URL (ensure your bucket has public access configured)
       const publicUrl = `https://storage.googleapis.com/${bucketName}/${blobName}`;
 
-      // Update the user's profilePictureUrl in the database
       user.profilePictureUrl = publicUrl;
       await user.save();
 

@@ -44,8 +44,6 @@ const registerUser = async (req, res) => {
   } catch (err) {
     console.error(err);
 
-    // If email sending failed *after* the user was created,
-    // delete the partial user so they can try again.
     if (user && user._id) {
       console.log('Cleaning up partially created user...');
       await User.deleteOne({ _id: user._id });

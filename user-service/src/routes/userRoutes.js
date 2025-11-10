@@ -16,16 +16,16 @@ const {
   verifyOtp,
   addCompletedQuestion,
   resendVerificationOtp,
-  checkUsername
+  checkUsername,
+  checkUserId
 } = require('../controllers/userController');
 
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image')) {
-    cb(null, true); // Accept the file
+    cb(null, true); 
   } else {
-    // Reject the file and provide an error message
     cb(new Error('Invalid file type. Only images are allowed.'), false);
   }
 };
@@ -42,6 +42,7 @@ router.post('/verify-otp', verifyOtp);
 router.post('/resend-verification-otp', resendVerificationOtp);
 router.post('/profile/add-completed-question', addCompletedQuestion);
 router.post('/check-username', checkUsername);
+router.post('/check-id', checkUserId);
 
 // Private Routes (Protected by middleware)
 router.put('/profile', protect, updateUserProfile);
