@@ -225,7 +225,7 @@ func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult
 			return
 		case <-time.After(30 * time.Second):
 			s.mutex.Lock()
-			key_timeout := req.Difficulty + "-" + req.Topic
+			key_timeout := createMatchKey(req.Difficulty, req.Topic)
 
 			if users, found := s.waitingPool[key_timeout]; found {
 				for i, user := range users {
