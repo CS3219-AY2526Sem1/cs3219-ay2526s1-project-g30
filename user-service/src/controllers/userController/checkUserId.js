@@ -13,12 +13,12 @@ const checkUserId = async (req, res) => {
   }
 
   try {
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select('username');
 
     if (user) {
-      return res.json({ isValid: true });
+      return res.status(200).json({ username: user.username });
     } else {
-      return res.json({ isValid: false });
+      return res.status(404).json({ message: 'User not found.' });
     }
   } catch (err) {
     console.error(err);
