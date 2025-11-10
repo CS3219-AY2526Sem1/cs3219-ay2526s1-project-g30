@@ -461,9 +461,10 @@ chatWss.on('connection', async (ws, req) => {
 
   ws.on('message', async (message) => {
     try {
-      const data = JSON.parse(message)
-      if (data.type === 'SendMsg') {
-        const content = data.content
+      const data = message.toString()
+      const parsedData = JSON.parse(data)
+      if (parsedData.type === 'SendMsg') {
+        const content = parsedData.content
         const broadcastData = {
             type: 'ChatMessage',
             username: username,
