@@ -3,26 +3,38 @@
 import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
 import { Label } from '@/components/ui/label'
 import { MultiSelect } from '@/components/ui/multi-select'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { ArrowRight, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { getUserPreferredLanguages } from '@/app/actions/profile'
-import { PROGRAMMING_LANGUAGE_OPTIONS, INTERVIEW_TOPIC_OPTIONS, DIFFICULTY_LEVELS } from '@/lib/constants'
+import { PROGRAMMING_LANGUAGE_OPTIONS } from '@/lib/constants'
 import { config } from '@/lib/config'
+import type { MultiSelectOption } from '@/components/ui/multi-select'
 
 const LANGUAGE_OPTIONS = PROGRAMMING_LANGUAGE_OPTIONS
-
-const DIFFICULTY_OPTIONS = DIFFICULTY_LEVELS
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false)
   const [preferredLanguages, setPreferredLanguages] = useState<string[]>([])
-  const [selectedTopic, setSelectedTopic] = useState<string>(INTERVIEW_TOPIC_OPTIONS[0].value)
+  const [selectedTopic, setSelectedTopic] = useState<string>('')
   const [isLoadingLanguages, setIsLoadingLanguages] = useState(true)
-  const [difficultyLevel, setDifficultyLevel] = useState<string>('Medium')
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
+  const [difficultyLevel, setDifficultyLevel] = useState<string>('')
+  
+  // Dynamic topics and difficulties from stats
+  const [availableTopics, setAvailableTopics] = useState<MultiSelectOption[]>([])
+  const [allStats, setAllStats] = useState<Record<string, Record<string, number>> | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  
   const toastIdRef = useRef<string | number | null>(null)
   const errorToastIdRef = useRef<string | number | null>(null)
   const matchingDescriptionRef = useRef<string>('')
@@ -89,6 +101,74 @@ export default function HomePage() {
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Load question stats
+  useEffect(() => {
+    async function loadQuestionStats() {
+      try {
+        setIsLoadingStats(true)
+        setStatsError(null)
+        
+        const { fetchQuestionStatsAction } = await import('@/app/actions/matching')
+        const result = await fetchQuestionStatsAction()
+        
+        if (!result.success || !result.stats) {
+          throw new Error(result.error || 'Failed to load question stats')
+        }
+
+        const stats = result.stats
+        
+        // Store all stats for dynamic difficulty filtering by topic
+        setAllStats(stats.difficultyCounts)
+        
+        // Create topic options from stats using original category names
+        const topicOptions: MultiSelectOption[] = stats.categories
+          .map((category: string) => ({
+            label: category,
+            value: category, // Use original category name, not normalized
+          }))
+          .sort((a: MultiSelectOption, b: MultiSelectOption) => a.label.localeCompare(b.label)) // Sort alphabetically A-Z
+        setAvailableTopics(topicOptions)
+        
+        // Set defaults
+        if (topicOptions.length > 0) {
+          setSelectedTopic(topicOptions[0].value)
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load question stats'
+        console.error('Failed to load question stats:', error)
+        setStatsError(errorMessage)
+        toast.error(errorMessage, { duration: 5000 })
+      } finally {
+        setIsLoadingStats(false)
+      }
+    }
+
+    loadQuestionStats()
+  }, [])
+
+  // When topic changes or stats load, update available difficulties for that topic
+  useEffect(() => {
+    if (!selectedTopic || !allStats) {
+      setDifficultyLevel('')
+      return
+    }
+
+    // Get difficulties for the selected topic from stats
+    const topicStats = allStats[selectedTopic] as Record<string, number> | undefined
+    if (topicStats) {
+      const availableDifficultiesForTopic = Object.keys(topicStats)
+        .map((diff) => diff.charAt(0).toUpperCase() + diff.slice(1))
+        .sort()
+      
+      // Set difficulty to first available for this topic
+      if (availableDifficultiesForTopic.length > 0) {
+        setDifficultyLevel(availableDifficultiesForTopic[0])
+      } else {
+        setDifficultyLevel('')
+      }
+    }
+  }, [selectedTopic, allStats])
 
   // Load user's preferred languages on mount
   useEffect(() => {
@@ -344,36 +424,63 @@ export default function HomePage() {
               />
             </div>
 
-            {/* Topic Selection */}
-            <div className="space-y-4">
-              <Label className="text-base font-semibold">
-                Topic
-              </Label>
-              <Tabs value={selectedTopic} onValueChange={setSelectedTopic}>
-                <TabsList className="grid w-full grid-cols-3">
-                  {INTERVIEW_TOPIC_OPTIONS.map((option) => (
-                    <TabsTrigger key={option.value} value={option.value}>
-                      {option.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            </div>
+            {/* Topic Selection and Difficulty Level - 2 Column Layout */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* Topic Selection */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">
+                  Topic
+                </Label>
+                {isLoadingStats ? (
+                  <div className="h-10 bg-muted animate-pulse rounded" />
+                ) : (
+                  <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a topic" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTopics.map((topic) => (
+                        <SelectItem key={topic.value} value={topic.value}>
+                          {topic.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
 
-            {/* Difficulty Level */}
-            <div className="space-y-4">
-              <Label className="text-base font-semibold">
-                Difficulty level
-              </Label>
-              <Tabs value={difficultyLevel} onValueChange={setDifficultyLevel}>
-                <TabsList className="grid w-full grid-cols-3">
-                  {DIFFICULTY_OPTIONS.map((option) => (
-                    <TabsTrigger key={option} value={option}>
-                      {option}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+              {/* Difficulty Level */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">
+                  Difficulty level
+                </Label>
+                {isLoadingStats ? (
+                  <div className="h-10 bg-muted animate-pulse rounded" />
+                ) : (() => {
+                  // Get available difficulties for selected topic
+                  const topicStats = selectedTopic && allStats ? (allStats[selectedTopic] as Record<string, number> | undefined) : undefined
+                  const availableDifficultiesForTopic = topicStats 
+                    ? Object.keys(topicStats)
+                        .map((diff) => diff.charAt(0).toUpperCase() + diff.slice(1))
+                        .sort()
+                    : []
+                  
+                  return (
+                    <Select value={difficultyLevel} onValueChange={setDifficultyLevel}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a difficulty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableDifficultiesForTopic.map((difficulty) => (
+                          <SelectItem key={difficulty} value={difficulty}>
+                            {difficulty}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )
+                })()}
+              </div>
             </div>
 
             <Separator />
@@ -381,18 +488,18 @@ export default function HomePage() {
             <Button
               size="lg"
               className="w-full text-base font-semibold"
-              disabled={isMatchingActive || preferredLanguages.length === 0}
+              disabled={isMatchingActive || preferredLanguages.length === 0 || isLoadingStats || !selectedTopic || !difficultyLevel}
               onClick={() => {
                 if (isMatchingActive) return
 
                 const selectedLanguageLabels = preferredLanguages
                   .map((lang) => {
-                    const option = LANGUAGE_OPTIONS.find((opt) => opt.value === lang)
+                    const option = LANGUAGE_OPTIONS.find((opt: MultiSelectOption) => opt.value === lang)
                     return option?.label || lang
                   })
                   .join(', ') || 'No languages selected'
                 
-                const selectedTopicLabel = INTERVIEW_TOPIC_OPTIONS.find((opt) => opt.value === selectedTopic)?.label || selectedTopic
+                const selectedTopicLabel = availableTopics.find((opt) => opt.value === selectedTopic)?.label || selectedTopic
                 
                 const matchingDescription = `${selectedTopicLabel} | ${selectedLanguageLabels} | ${difficultyLevel}`
 
@@ -408,7 +515,7 @@ export default function HomePage() {
 
                 // Fire off the matching request via the API route - allow cancellation to work independently
                 const formData = new FormData()
-                formData.append('difficulty', difficultyLevel)
+                formData.append('difficulty', difficultyLevel.toLowerCase())
                 formData.append('topic', selectedTopic)
                 formData.append('languages', preferredLanguages.join(','))
 

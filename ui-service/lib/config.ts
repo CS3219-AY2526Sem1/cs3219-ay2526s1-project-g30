@@ -71,7 +71,7 @@ export const config = {
   questionService: {
     baseUrl:
       process.env.NEXT_PUBLIC_QUESTION_SERVICE_URL ||
-      'http://localhost:3002/questions',
+      'http://localhost:3002',
     timeout: parseInt(process.env.QUESTION_SERVICE_TIMEOUT || '10000'),
   },
 

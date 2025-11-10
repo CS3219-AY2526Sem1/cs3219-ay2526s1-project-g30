@@ -523,3 +523,35 @@ export async function fetchQuestionAction(questionId: string): Promise<{ success
     };
   }
 }
+
+/**
+ * Server Action to fetch question statistics (available categories and difficulties).
+ *
+ * This wraps the question service client in a Server Action so that
+ * the client component can safely fetch stats without directly importing
+ * the server-only questionServiceClient module.
+ */
+export async function fetchQuestionStatsAction(): Promise<{
+  success: boolean;
+  stats?: {
+    categories: string[];
+    difficultyCounts: Record<string, Record<'easy' | 'medium' | 'hard', number>>;
+  };
+  error?: string;
+}> {
+  try {
+    const { fetchQuestionStats } = await import('@/lib/questionServiceClient');
+    const stats = await fetchQuestionStats();
+    return {
+      success: true,
+      stats,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch question stats';
+    logServiceError('questionService', '/stats', error);
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
