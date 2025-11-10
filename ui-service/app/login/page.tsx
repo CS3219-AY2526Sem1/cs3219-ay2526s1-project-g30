@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useTransition, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { EmailEntryView } from './EmailEntryView';
 import { PasswordAuthView } from './PasswordAuthView';
@@ -9,13 +9,35 @@ import { SignupView } from './SignupView';
 import { OtpVerificationView } from './OtpVerificationView';
 import { SignupCompleteView } from './SignupCompleteView';
 import { ResetPasswordView } from './ResetPasswordView';
+import { requestPasswordReset } from '@/app/actions/auth';
 
 type ViewState = 'email-entry' | 'password-auth' | 'signup' | 'otp-verification' | 'signup-complete' | 'reset-password';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [currentView, setCurrentView] = useState<ViewState>('email-entry');
-  const [storedEmail, setStoredEmail] = useState<string>('');
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+
+  // Initialize view state based on query parameters
+  const getInitialView = (): ViewState => {
+    const step = searchParams.get('step');
+    if (step === 'reset-password') {
+      return 'reset-password';
+    }
+    return 'email-entry';
+  };
+
+  const getInitialEmail = (): string => {
+    const step = searchParams.get('step');
+    const email = searchParams.get('email');
+    if (step === 'reset-password' && email) {
+      return decodeURIComponent(email);
+    }
+    return '';
+  };
+
+  const [currentView, setCurrentView] = useState<ViewState>(getInitialView());
+  const [storedEmail, setStoredEmail] = useState<string>(getInitialEmail());
   const [emailInput, setEmailInput] = useState<string>('');
   const [passwordInput, setPasswordInput] = useState<string>('');
   const [usernameInput, setUsernameInput] = useState<string>('');
@@ -23,6 +45,14 @@ export default function LoginPage() {
   const [signupPassword, setSignupPassword] = useState<string>('');
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState<string>('');
   const [storedPassword, setStoredPassword] = useState<string>('');
+
+  // Clear query parameters after mount
+  useEffect(() => {
+    const step = searchParams.get('step');
+    if (step) {
+      window.history.replaceState({}, '', '/login');
+    }
+  }, [searchParams]);
 
   const handleContinueEmail = () => {
     if (emailInput.trim()) {
@@ -70,7 +100,14 @@ export default function LoginPage() {
   };
 
   const handleInitiateResetPassword = () => {
-    setCurrentView('reset-password');
+    const formData = new FormData();
+    formData.set('email', storedEmail);
+    startTransition(async () => {
+      const result = await requestPasswordReset(undefined, formData);
+      if (result?.success) {
+        setCurrentView('reset-password');
+      }
+    });
   };
 
   const handleBackFromResetPassword = () => {
