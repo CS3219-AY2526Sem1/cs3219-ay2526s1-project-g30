@@ -39,6 +39,15 @@ export interface MatchResponse {
   data?: MatchResult;
 }
 
+export interface CancelRequest {
+  userId: string;
+}
+
+export interface CancelResponse {
+  status: 'cancelled' | 'not_found';
+  message: string;
+}
+
 /**
  * Initiates a matching request with the matching service.
  *
@@ -157,5 +166,87 @@ export async function requestMatch(request: MatchRequest): Promise<MatchResult> 
       errorType: 'unknown',
     });
     throw new MatchingServiceError(500, 'Unknown error while requesting match');
+  }
+}
+
+/**
+ * Cancels an active matching request with the matching service.
+ *
+ * If the user has an active match request in the pool, this will remove them
+ * and return a success status. If the user is not in the pool (already matched,
+ * timed out, or never existed), it returns a not_found status.
+ *
+ * @param userId The ID of the user cancelling their match request
+ * @returns The cancellation result
+ * @throws MatchingServiceError if the request fails
+ */
+export async function cancelMatchRequest(userId: string): Promise<CancelResponse> {
+  const url = `${config.matchingService.baseUrl}/cancel`;
+  const startTime = Date.now();
+
+  logOutgoingRequest('matchingService', '/cancel', 'POST', {
+    userId,
+    timestamp: new Date().toISOString(),
+  });
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    const durationMilliseconds = Date.now() - startTime;
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      logServiceError('matchingService', '/cancel', new Error(errorData.error || 'Matching service error'), {
+        statusCode: response.status,
+        userId,
+      });
+      logIncomingResponse('matchingService', '/cancel', response.status, {
+        durationMilliseconds,
+        userId,
+        timestamp: new Date().toISOString(),
+      });
+      throw new MatchingServiceError(response.status, errorData.error || 'Failed to cancel match request');
+    }
+
+    const data: CancelResponse = await response.json();
+
+    logIncomingResponse('matchingService', '/cancel', response.status, {
+      status: data.status,
+      durationMilliseconds,
+      userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    logTiming('matchingService /cancel', durationMilliseconds, {
+      userId,
+    });
+
+    return data;
+  } catch (error) {
+    if (error instanceof MatchingServiceError) {
+      throw error;
+    }
+
+    if (error instanceof TypeError) {
+      logServiceError('matchingService', '/cancel', error, {
+        statusCode: 0,
+        userId,
+        errorType: 'network',
+      });
+      throw new MatchingServiceError(0, `Network error: ${error.message}`);
+    }
+
+    logServiceError('matchingService', '/cancel', error, {
+      statusCode: 500,
+      userId,
+      errorType: 'unknown',
+    });
+    throw new MatchingServiceError(500, 'Unknown error while cancelling match request');
   }
 }

@@ -64,8 +64,8 @@ export const config = {
       'http://localhost:8080/api/v1',
     // The matching service uses a 30-second timeout before returning "no match found"
     timeoutSeconds: 30,
-    // Client-side timeout includes buffer for network latency (120 seconds = 30s + 90s buffer)
-    timeoutMs: parseInt(process.env.MATCHING_SERVICE_TIMEOUT || '120000'),
+    // Client-side timeout includes buffer for network latency (32 seconds = 30s + 2s buffer)
+    timeoutMs: parseInt(process.env.MATCHING_SERVICE_TIMEOUT || '32000'),
   },
 
   questionService: {

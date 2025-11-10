@@ -385,6 +385,121 @@ export async function terminateCollaborativeSession(
 }
 
 /**
+ * Cancels an active matching request for the current user.
+ *
+ * This Server Action:
+ * 1. Verifies the user is authenticated
+ * 2. Calls the matching service to cancel their active match request
+ * 3. Returns success or error status
+ *
+ * Can be called in two ways:
+ * - From useActionState: await cancelMatching(previousState)
+ * - From startTransition: startTransition(() => cancelMatching())
+ *
+ * @param previousState The previous form state (optional, unused but required by useActionState)
+ * @returns Object with success status and optional error message
+ */
+export async function cancelMatching(
+  previousState?: MatchingFormState | undefined
+): Promise<MatchingFormState> {
+  logServerActionStart('cancelMatching');
+  const startTime = Date.now();
+
+  try {
+    // Verify user is authenticated
+    const session = await requireAuth();
+
+    logOutgoingRequest('auth', '', 'GET', {
+      userId: session.userId,
+      action: 'fetch session',
+      timestamp: new Date().toISOString(),
+    });
+
+    // Import dynamically to avoid circular dependency issues
+    const { cancelMatchRequest } = await import('@/lib/matchingServiceClient');
+
+    logOutgoingRequest('matchingService', '/cancel', 'POST', {
+      userId: session.userId,
+      username: session.username,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Call matching service to cancel the request
+    const cancelResult = await cancelMatchRequest(session.userId);
+
+    const durationMilliseconds = Date.now() - startTime;
+
+    logIncomingResponse('matchingService', '/cancel', 200, {
+      status: cancelResult.status,
+      userId: session.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    logTiming('matching cancellation request', durationMilliseconds, {
+      userId: session.userId,
+    });
+
+    logServerActionSuccess('cancelMatching', {
+      userId: session.userId,
+      status: cancelResult.status,
+    });
+
+    return {
+      success: true,
+      error: undefined,
+    };
+  } catch (error) {
+    // Re-throw redirect errors to allow Next.js to handle the redirect
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    if (error instanceof MatchingServiceError) {
+      logServiceError('matchingService', '/cancel', error, {
+        statusCode: error.statusCode,
+      });
+
+      if (error.statusCode === 404) {
+        // User not found in matching pool - this is acceptable
+        logServerActionSuccess('cancelMatching', {
+          message: 'No active matching request found',
+        });
+        return {
+          success: true,
+          error: undefined,
+        };
+      }
+
+      return {
+        success: false,
+        error: `Matching service error: ${error.message}`,
+      };
+    }
+
+    if (error instanceof Error) {
+      if (error.message.includes('Unauthorized')) {
+        logServerActionError('cancelMatching', 'User not authenticated');
+        return {
+          success: false,
+          error: 'You must be logged in to cancel matching',
+        };
+      }
+      logServiceError('matchingService', '/cancel', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+
+    logServerActionError('cancelMatching', error);
+    return {
+      success: false,
+      error: 'An unexpected error occurred while trying to cancel matching',
+    };
+  }
+}
+
+/**
  * Server Action to fetch a question by ID.
  * 
  * This wraps the question service client in a Server Action so that
