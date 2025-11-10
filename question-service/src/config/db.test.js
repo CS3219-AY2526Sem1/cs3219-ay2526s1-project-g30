@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT‑5 Thinking), date: 2025‑11-10
+// Scope: Generated implementation of unit testing.
+// Author review: Correctness validated.
+
 import { describe, it, vi, expect, beforeEach, afterEach } from 'vitest';
 import mongoose from 'mongoose';
 import connectDB from './db.js';

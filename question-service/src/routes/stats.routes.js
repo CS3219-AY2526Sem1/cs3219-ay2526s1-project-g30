@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT‑5 Thinking), date: 2025‑11-08
+// Scope: Generated implementation based on API requirements.
+// Author review: Validated correctness.
+
 import express from 'express';
 import QuestionStats from '../models/questionStats.model.js';
 
