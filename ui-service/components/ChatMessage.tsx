@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Spinner } from '@/components/ui/spinner'
+import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 import { cn } from '@/lib/utils'
 
 interface ChatMessageProps {
@@ -74,14 +75,19 @@ export function ChatMessage({
         </div>
         <div
           className={cn(
-            'rounded-md px-3 py-2 text-sm',
+            'rounded-md px-3 py-2 text-sm flex items-center',
             isCurrentUser
               ? 'bg-primary text-primary-foreground'
               : 'bg-muted text-foreground',
             isSending && 'opacity-60'
           )}
         >
-          {content}
+          <MarkdownRenderer
+            content={content}
+            textSize={14}
+            isCompact={true}
+            isDark={isCurrentUser}
+          />
         </div>
       </div>
     </div>
