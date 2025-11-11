@@ -5,6 +5,12 @@ import {generateFunctionTemplate} from "../utils/generateSignature.js";
 
 const router = express.Router();
 
+// helper function to create a case-insensitive regex filter
+function caseInsensitiveFilter(value) {
+    const escapedValue = RegExp.escape(value);
+    return { $regex: `^${escapedValue}$`, $options: 'i' };
+}
+
 // get a random question by difficulty and category, avoid duplicates for user completed qns
 router.get('/randomQuestion', async (req, res) => {
     try {
@@ -31,8 +37,8 @@ router.get('/randomQuestion', async (req, res) => {
 
         // build base filter (difficulty/category)
         const baseFilter = {};
-        if (difficulty) baseFilter.difficulty = difficulty;
-        if (category) baseFilter.category = category;
+        if (difficulty) baseFilter.difficulty = caseInsensitiveFilter(difficulty);
+        if (category) baseFilter.category = caseInsensitiveFilter(category);
 
         // progressive selection
         let question = null;
