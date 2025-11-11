@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-10-09
+// Scope: Check for correctness of Mongoose schema definitions
+// Author review: Validated correctness.
+
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 

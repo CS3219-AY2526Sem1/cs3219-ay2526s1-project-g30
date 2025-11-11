@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-10-09
+// Scope: Generated implementation based on my controller aggregation requirements.
+// Author review: Validated correctness.
+
 module.exports = {
   registerUser: require('./registerUser'),
   loginUser: require('./loginUser'),

@@ -1,9 +1,14 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-10-19
+// Scope: Generated implementation based on my API requirements.
+// Author review: Validated correctness.
+
 const User = require('../../models/User');
 const { Storage } = require('@google-cloud/storage');
 const path = require('path');
 
 const storage = new Storage();
-const bucketName = 'peerprep-user-service';
+const bucketName = process.env.GCS_BUCKET_NAME;
 const bucket = storage.bucket(bucketName);
 
 const uploadProfilePicture = async (req, res) => {
