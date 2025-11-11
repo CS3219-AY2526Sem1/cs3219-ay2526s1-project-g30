@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const path = require('path');
 const multer = require('multer');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -14,34 +13,41 @@ const {
   forgotPassword,
   resetPassword,
   uploadProfilePicture,
-  verifyEmail,
+  verifyOtp,
   addCompletedQuestion,
+  resendVerificationOtp,
+  checkUsername,
+  checkUserId
 } = require('../controllers/userController');
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); 
-  },
-  filename: function (req, file, cb) {
-    cb(null, `${req.user.id}-${Date.now()}${path.extname(file.originalname)}`);
-  },
-});
+const storage = multer.memoryStorage();
 
-const upload = multer({ storage: storage });
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image')) {
+    cb(null, true); 
+  } else {
+    cb(new Error('Invalid file type. Only images are allowed.'), false);
+  }
+};
+
+const upload = multer({ storage: storage, fileFilter: fileFilter });
 
 // Public Routes
 router.post('/register', registerUser); 
 router.post('/login', loginUser);
-router.get('/verify-email/:token', verifyEmail);
-router.get('/:id', getUserProfile);
+router.get('/:username', getUserProfile);
 router.post('/forgot-password', forgotPassword);
-router.put('/reset-password/:token', resetPassword);
+router.put('/reset-password', resetPassword);
+router.post('/verify-otp', verifyOtp);
+router.post('/resend-verification-otp', resendVerificationOtp);
+router.post('/profile/add-completed-question', addCompletedQuestion);
+router.post('/check-username', checkUsername);
+router.get('/check-id/:id', checkUserId);
 
 // Private Routes (Protected by middleware)
 router.put('/profile', protect, updateUserProfile);
 router.delete('/profile', protect, deleteUserProfile);
 router.put('/change-password', protect, changePassword);
 router.put('/profile/picture', protect, upload.single('profilePicture'), uploadProfilePicture);
-router.post('/profile/questions-completed', protect, addCompletedQuestion);
 
 module.exports = router;
