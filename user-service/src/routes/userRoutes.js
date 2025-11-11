@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-10-09
+// Scope: Check for correctness of Express.js route definitions and middleware usage.
+// Author review: Validated correctness.
+
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');

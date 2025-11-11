@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-11-10
+// Scope: Generated implementation based on my API requirements.
+// Author review: Validated correctness.
+
 const User = require('../../models/User');
 const mongoose = require('mongoose'); 
 

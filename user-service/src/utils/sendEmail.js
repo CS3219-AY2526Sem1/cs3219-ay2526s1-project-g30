@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-10-18
+// Scope: Generated implementation based on my function requirements.
+// Author review: Validated correctness.
+
 const sgMail = require('@sendgrid/mail');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
