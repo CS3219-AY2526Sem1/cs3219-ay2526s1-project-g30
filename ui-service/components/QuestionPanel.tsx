@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 
 interface QuestionPanelProps {
   title: string
@@ -56,12 +57,12 @@ export function QuestionPanel({
         {/* Description */}
         <div className="space-y-2">
           <h2 className="text-lg font-semibold text-muted-foreground">Description</h2>
-          <p
-            className="text-foreground leading-relaxed"
-            style={{ fontSize: `${textSize}px` }}
-          >
-            {description}
-          </p>
+          <div style={{ fontSize: `${textSize}px` }}>
+            <MarkdownRenderer
+              content={description}
+              textSize={textSize}
+            />
+          </div>
         </div>
 
         {/* Examples */}
@@ -81,33 +82,42 @@ export function QuestionPanel({
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground font-mono uppercase">Input:</p>
-                    <p
+                    <div
                       className="text-foreground font-mono mt-1"
                       style={{ fontSize: `${textSize - 2}px` }}
                     >
-                      {example.input}
-                    </p>
+                      <MarkdownRenderer
+                        content={example.input}
+                        textSize={textSize - 2}
+                      />
+                    </div>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground font-mono uppercase">Output:</p>
-                    <p
+                    <div
                       className="text-foreground font-mono mt-1"
                       style={{ fontSize: `${textSize - 2}px` }}
                     >
-                      {example.output}
-                    </p>
+                      <MarkdownRenderer
+                        content={example.output}
+                        textSize={textSize - 2}
+                      />
+                    </div>
                   </div>
                   {example.explanation && (
                     <div>
                       <p className="text-xs text-muted-foreground font-mono uppercase">
                         Explanation:
                       </p>
-                      <p
+                      <div
                         className="text-foreground mt-1"
                         style={{ fontSize: `${textSize}px` }}
                       >
-                        {example.explanation}
-                      </p>
+                        <MarkdownRenderer
+                          content={example.explanation}
+                          textSize={textSize}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

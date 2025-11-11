@@ -123,7 +123,7 @@ export function SignupCompleteView({
 
         <Field>
           <FieldLabel htmlFor="language">
-            Preferred coding language
+            Most preferred language
           </FieldLabel>
           <FieldContent>
             <Popover open={languageOpen} onOpenChange={setLanguageOpen}>

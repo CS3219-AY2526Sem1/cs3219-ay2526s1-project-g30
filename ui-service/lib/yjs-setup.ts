@@ -103,6 +103,7 @@ export async function setupYJS({
         connect: true,
         params: {
           userid: userId,
+          purpose: 'doc',
         },
       }
     );

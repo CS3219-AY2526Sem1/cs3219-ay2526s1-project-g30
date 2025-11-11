@@ -1,34 +1,46 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useActionState } from 'react'
+import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
 import { Label } from '@/components/ui/label'
 import { MultiSelect } from '@/components/ui/multi-select'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { getUserPreferredLanguages } from '@/app/actions/profile'
-import { startMatching } from '@/app/actions/matching'
-import { PROGRAMMING_LANGUAGE_OPTIONS, INTERVIEW_TOPIC_OPTIONS, DIFFICULTY_LEVELS } from '@/lib/constants'
+import { PROGRAMMING_LANGUAGE_OPTIONS } from '@/lib/constants'
 import { config } from '@/lib/config'
+import type { MultiSelectOption } from '@/components/ui/multi-select'
 
 const LANGUAGE_OPTIONS = PROGRAMMING_LANGUAGE_OPTIONS
-
-const DIFFICULTY_OPTIONS = DIFFICULTY_LEVELS
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false)
   const [preferredLanguages, setPreferredLanguages] = useState<string[]>([])
-  const [selectedTopic, setSelectedTopic] = useState<string>(INTERVIEW_TOPIC_OPTIONS[0].value)
+  const [selectedTopic, setSelectedTopic] = useState<string>('')
   const [isLoadingLanguages, setIsLoadingLanguages] = useState(true)
-  const [difficultyLevel, setDifficultyLevel] = useState<string>('Medium')
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
+  const [difficultyLevel, setDifficultyLevel] = useState<string>('')
+  
+  // Dynamic topics and difficulties from stats
+  const [availableTopics, setAvailableTopics] = useState<MultiSelectOption[]>([])
+  const [allStats, setAllStats] = useState<Record<string, Record<string, number>> | null>(null)
+  const [statsError, setStatsError] = useState<string | null>(null)
+  
   const toastIdRef = useRef<string | number | null>(null)
   const errorToastIdRef = useRef<string | number | null>(null)
   const matchingDescriptionRef = useRef<string>('')
   const [isMatchingActive, setIsMatchingActive] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const userCancelledRef = useRef(false)
 
   const [countdownSeconds, setCountdownSeconds] = useState<number>(config.matchingService.timeoutSeconds)
   const [isCountingDown, setIsCountingDown] = useState(false)
@@ -85,15 +97,78 @@ export default function HomePage() {
     setCountdownSeconds(config.matchingService.timeoutSeconds)
   }, [])
 
-  const [matchingState, matchingAction, isMatchingPending] = useActionState(
-    startMatching,
-    undefined
-  )
-
   // Set mounted flag to avoid hydration issues with Radix components
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Load question stats
+  useEffect(() => {
+    async function loadQuestionStats() {
+      try {
+        setIsLoadingStats(true)
+        setStatsError(null)
+        
+        const { fetchQuestionStatsAction } = await import('@/app/actions/matching')
+        const result = await fetchQuestionStatsAction()
+        
+        if (!result.success || !result.stats) {
+          throw new Error(result.error || 'Failed to load question stats')
+        }
+
+        const stats = result.stats
+        
+        // Store all stats for dynamic difficulty filtering by topic
+        setAllStats(stats.difficultyCounts)
+        
+        // Create topic options from stats using original category names
+        const topicOptions: MultiSelectOption[] = stats.categories
+          .map((category: string) => ({
+            label: category,
+            value: category, // Use original category name, not normalized
+          }))
+          .sort((a: MultiSelectOption, b: MultiSelectOption) => a.label.localeCompare(b.label)) // Sort alphabetically A-Z
+        setAvailableTopics(topicOptions)
+        
+        // Set defaults
+        if (topicOptions.length > 0) {
+          setSelectedTopic(topicOptions[0].value)
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load question stats'
+        console.error('Failed to load question stats:', error)
+        setStatsError(errorMessage)
+        toast.error(errorMessage, { duration: 5000 })
+      } finally {
+        setIsLoadingStats(false)
+      }
+    }
+
+    loadQuestionStats()
+  }, [])
+
+  // When topic changes or stats load, update available difficulties for that topic
+  useEffect(() => {
+    if (!selectedTopic || !allStats) {
+      setDifficultyLevel('')
+      return
+    }
+
+    // Get difficulties for the selected topic from stats
+    const topicStats = allStats[selectedTopic] as Record<string, number> | undefined
+    if (topicStats) {
+      const availableDifficultiesForTopic = Object.keys(topicStats)
+        .map((diff) => diff.charAt(0).toUpperCase() + diff.slice(1))
+        .sort()
+      
+      // Set difficulty to first available for this topic
+      if (availableDifficultiesForTopic.length > 0) {
+        setDifficultyLevel(availableDifficultiesForTopic[0])
+      } else {
+        setDifficultyLevel('')
+      }
+    }
+  }, [selectedTopic, allStats])
 
   // Load user's preferred languages on mount
   useEffect(() => {
@@ -111,7 +186,6 @@ export default function HomePage() {
 
     loadPreferredLanguages()
   }, [])
-
   // When matching starts, create toast and start countdown
   useEffect(() => {
     if (!isMatchingActive) return
@@ -133,7 +207,7 @@ export default function HomePage() {
     resetCountdown()
     startCountdown()
 
-    // Create initial toast
+    // Create initial toast with cancel button
     toast(
       <div className="flex items-center gap-3">
         <Spinner className="size-5" />
@@ -148,9 +222,60 @@ export default function HomePage() {
         id: toastIdRef.current,
         duration: Infinity,
         position: 'top-center',
+        actionButtonStyle: {
+          backgroundColor: 'var(--destructive)',
+          color: 'var(--destructive-foreground)',
+        },
+        action: {
+          label: <div className="flex items-center justify-center gap-2 text-white"><X className="size-4" /> Cancel</div>,
+          onClick: async () => {
+            // Mark that user cancelled IMMEDIATELY, before any async operations
+            // This ensures we suppress errors even if the matching response arrives concurrently
+            userCancelledRef.current = true
+            
+            if (toastIdRef.current) {
+              toast.dismiss(toastIdRef.current)
+              toastIdRef.current = null
+            }
+            stopCountdown()
+            
+            // Call the cancel API route directly (not a Server Action)
+            // This avoids queuing issues with concurrent Server Actions on the same route
+            try {
+              const response = await fetch('/api/matching/cancel', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              })
+              
+              const result = await response.json()
+              
+              if (result.success) {
+                setIsMatchingActive(false)
+                toast.success('Match request cancelled', {
+                  duration: 2000,
+                  position: 'top-center',
+                })
+              } else {
+                // Show error but still hide the timeout message since user explicitly cancelled
+                toast.error(result.error || 'Failed to cancel match request', {
+                  duration: 4000,
+                  position: 'top-center',
+                })
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+              toast.error(errorMessage, {
+                duration: 4000,
+                position: 'top-center',
+              })
+            }
+          },
+        },
       }
     )
-  }, [isMatchingActive, resetCountdown, startCountdown])
+  }, [isMatchingActive, resetCountdown, startCountdown, stopCountdown])
 
   // Update toast countdown display when countdown changes
   useEffect(() => {
@@ -163,7 +288,7 @@ export default function HomePage() {
       return
     }
 
-    // Update the toast with the new countdown value
+    // Update the toast with the new countdown value and cancel button
     toast(
       <div className="flex items-center gap-3">
         <Spinner className="size-5" />
@@ -178,56 +303,58 @@ export default function HomePage() {
         id: toastIdRef.current,
         duration: Infinity,
         position: 'top-center',
+        actionButtonStyle: {
+          backgroundColor: 'var(--destructive)',
+          color: 'var(--destructive-foreground)',
+        },
+        action: {
+          label: <div className="flex items-center justify-center gap-2 text-white"><X className="size-4" /> Cancel</div>,
+          onClick: async () => {
+            // Mark that user cancelled IMMEDIATELY, before any async operations
+            // This ensures we suppress errors even if the matching response arrives concurrently
+            userCancelledRef.current = true
+            
+            if (toastIdRef.current) {
+              toast.dismiss(toastIdRef.current)
+              toastIdRef.current = null
+            }
+            stopCountdown()
+            // Call the cancel API route directly (not a Server Action)
+            // This avoids queuing issues with concurrent Server Actions on the same route
+            try {
+              const response = await fetch('/api/matching/cancel', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              })
+              
+              const result = await response.json()
+              
+              if (result.success) {
+                setIsMatchingActive(false)
+                toast.success('Match request cancelled', {
+                  duration: 2000,
+                  position: 'top-center',
+                })
+              } else {
+                toast.error(result.error || 'Failed to cancel match request', {
+                  duration: 4000,
+                  position: 'top-center',
+                })
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+              toast.error(errorMessage, {
+                duration: 4000,
+                position: 'top-center',
+              })
+            }
+          },
+        },
       }
     )
-  }, [countdownSeconds, isMatchingActive])
-
-  // Handle errors and timeout
-  useEffect(() => {
-    if (matchingState?.error) {
-      if (toastIdRef.current) {
-        toast.dismiss(toastIdRef.current)
-        toastIdRef.current = null
-      }
-      stopCountdown()
-      setIsMatchingActive(false)
-
-      // Show all errors including timeout errors with longer duration (8 seconds) so users can read them
-      const id = toast.error(matchingState.error, {
-        duration: 8000,
-        position: 'top-center',
-      })
-      errorToastIdRef.current = id
-    }
-  }, [matchingState?.error, stopCountdown])
-
-  // Handle successful match
-  useEffect(() => {
-    if (matchingState?.success && matchingState?.matchData) {
-      if (toastIdRef.current) {
-        toast.dismiss(toastIdRef.current)
-        toastIdRef.current = null
-      }
-      stopCountdown()
-      setIsMatchingActive(false)
-
-      // Show success toast for 1.5 seconds before redirecting
-      toast.success('Match found! Redirecting to interview room...', {
-        duration: 1500,
-        position: 'top-center',
-      })
-
-      // Redirect after 1.5 seconds
-      const { sessionId, questionId, programmingLang } = matchingState.matchData
-      const searchParams = new URLSearchParams({
-        questionID: questionId,
-        language: programmingLang,
-      })
-      setTimeout(() => {
-        window.location.href = `/match/${sessionId}?${searchParams.toString()}`
-      }, 1500)
-    }
-  }, [matchingState?.success, matchingState?.matchData, stopCountdown])
+  }, [countdownSeconds, isMatchingActive, stopCountdown])
 
   // Show loading skeleton before mounting to avoid hydration issues
   if (!isMounted) {
@@ -297,82 +424,186 @@ export default function HomePage() {
               />
             </div>
 
-            {/* Topic Selection */}
-            <div className="space-y-4">
-              <Label className="text-base font-semibold">
-                Topic
-              </Label>
-              <Tabs value={selectedTopic} onValueChange={setSelectedTopic}>
-                <TabsList className="grid w-full grid-cols-3">
-                  {INTERVIEW_TOPIC_OPTIONS.map((option) => (
-                    <TabsTrigger key={option.value} value={option.value}>
-                      {option.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            </div>
+            {/* Topic Selection and Difficulty Level - 2 Column Layout */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* Topic Selection */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">
+                  Topic
+                </Label>
+                {isLoadingStats ? (
+                  <div className="h-10 bg-muted animate-pulse rounded" />
+                ) : (
+                  <Select value={selectedTopic} onValueChange={setSelectedTopic}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a topic" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTopics.map((topic) => (
+                        <SelectItem key={topic.value} value={topic.value}>
+                          {topic.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
 
-            {/* Difficulty Level */}
-            <div className="space-y-4">
-              <Label className="text-base font-semibold">
-                Difficulty level
-              </Label>
-              <Tabs value={difficultyLevel} onValueChange={setDifficultyLevel}>
-                <TabsList className="grid w-full grid-cols-3">
-                  {DIFFICULTY_OPTIONS.map((option) => (
-                    <TabsTrigger key={option} value={option}>
-                      {option}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+              {/* Difficulty Level */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">
+                  Difficulty level
+                </Label>
+                {isLoadingStats ? (
+                  <div className="h-10 bg-muted animate-pulse rounded" />
+                ) : (() => {
+                  // Get available difficulties for selected topic
+                  const topicStats = selectedTopic && allStats ? (allStats[selectedTopic] as Record<string, number> | undefined) : undefined
+                  const availableDifficultiesForTopic = topicStats 
+                    ? Object.keys(topicStats)
+                        .map((diff) => diff.charAt(0).toUpperCase() + diff.slice(1))
+                        .sort()
+                    : []
+                  
+                  return (
+                    <Select value={difficultyLevel} onValueChange={setDifficultyLevel}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a difficulty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableDifficultiesForTopic.map((difficulty) => (
+                          <SelectItem key={difficulty} value={difficulty}>
+                            {difficulty}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )
+                })()}
+              </div>
             </div>
 
             <Separator />
 
-            <form action={matchingAction} className="space-y-4">
-              <input type="hidden" name="difficulty" value={difficultyLevel} />
-              <input type="hidden" name="topic" value={selectedTopic} />
-              <input type="hidden" name="languages" value={preferredLanguages.join(',')} />
+            <Button
+              size="lg"
+              className="w-full text-base font-semibold"
+              disabled={isMatchingActive || preferredLanguages.length === 0 || isLoadingStats || !selectedTopic || !difficultyLevel}
+              onClick={() => {
+                if (isMatchingActive) return
 
-              <Button
-                size="lg"
-                type="submit"
-                className="w-full text-base font-semibold"
-                disabled={isMatchingPending || preferredLanguages.length === 0}
-                onClick={() => {
-                  if (isMatchingPending) return
+                const selectedLanguageLabels = preferredLanguages
+                  .map((lang) => {
+                    const option = LANGUAGE_OPTIONS.find((opt: MultiSelectOption) => opt.value === lang)
+                    return option?.label || lang
+                  })
+                  .join(', ') || 'No languages selected'
+                
+                const selectedTopicLabel = availableTopics.find((opt) => opt.value === selectedTopic)?.label || selectedTopic
+                
+                const matchingDescription = `${selectedTopicLabel} | ${selectedLanguageLabels} | ${difficultyLevel}`
 
-                  const selectedLanguageLabels = preferredLanguages
-                    .map((lang) => {
-                      const option = LANGUAGE_OPTIONS.find((opt) => opt.value === lang)
-                      return option?.label || lang
+                // Store description in ref for use in effects
+                matchingDescriptionRef.current = matchingDescription
+
+                // Reset cancellation flag at the start of a new matching attempt
+                userCancelledRef.current = false
+
+                // Trigger matching attempt - this will fire the toast/countdown effects
+                // Must set this BEFORE the async call so the UI updates immediately
+                setIsMatchingActive(true)
+
+                // Fire off the matching request via the API route - allow cancellation to work independently
+                const formData = new FormData()
+                formData.append('difficulty', difficultyLevel.toLowerCase())
+                formData.append('topic', selectedTopic)
+                formData.append('languages', preferredLanguages.join(','))
+
+                // Use startTransition for the background matching operation
+                // but DON'T await it - let it run independently
+                startTransition(async () => {
+                  try {
+                    const response = await fetch('/api/matching/start', {
+                      method: 'POST',
+                      body: formData,
                     })
-                    .join(', ') || 'No languages selected'
-                  
-                  const selectedTopicLabel = INTERVIEW_TOPIC_OPTIONS.find((opt) => opt.value === selectedTopic)?.label || selectedTopic
-                  
-                  const matchingDescription = `${selectedTopicLabel} | ${selectedLanguageLabels} | ${difficultyLevel}`
 
-                  // Store description in ref for use in effects
-                  matchingDescriptionRef.current = matchingDescription
+                    const result = await response.json() as { success: boolean; matchData?: { sessionId: string; questionId: string; programmingLang: string }; error?: string; status?: string }
 
-                  // Trigger matching attempt - this will fire the toast/countdown effects
-                  setIsMatchingActive(true)
-                }}
-              >
-                {isMatchingPending ? (
-                  <>
-                    <Spinner className="size-4" /> Matching...
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight /> Start matching
-                  </>
-                )}
-              </Button>
-            </form>
+                    if (result.success && result.matchData) {
+                      // Dismiss the matching toast
+                      if (toastIdRef.current) {
+                        toast.dismiss(toastIdRef.current)
+                        toastIdRef.current = null
+                      }
+                      stopCountdown()
+                      setIsMatchingActive(false)
+
+                      // Show success toast for 1.5 seconds before redirecting
+                      toast.success('Match found! Redirecting to interview room...', {
+                        duration: 1500,
+                        position: 'top-center',
+                      })
+
+                      // Redirect after 1.5 seconds
+                      const { sessionId, questionId, programmingLang } = result.matchData
+                      const searchParams = new URLSearchParams({
+                        questionID: questionId,
+                        language: programmingLang,
+                      })
+                      setTimeout(() => {
+                        window.location.href = `/match/${sessionId}?${searchParams.toString()}`
+                      }, 1500)
+                    } else if (result.error) {
+                      // Only show error if user didn't explicitly cancel
+                      if (toastIdRef.current) {
+                        toast.dismiss(toastIdRef.current)
+                        toastIdRef.current = null
+                      }
+                      stopCountdown()
+                      setIsMatchingActive(false)
+
+                      // Show error if user didn't cancel - check flag before showing
+                      if (!userCancelledRef.current) {
+                        const id = toast.error(result.error, {
+                          duration: 8000,
+                          position: 'top-center',
+                        })
+                        errorToastIdRef.current = id
+                      }
+                    }
+                  } catch (error) {
+                    // Dismiss the matching toast
+                    if (toastIdRef.current) {
+                      toast.dismiss(toastIdRef.current)
+                      toastIdRef.current = null
+                    }
+                    stopCountdown()
+                    setIsMatchingActive(false)
+
+                    // Show error if user didn't cancel
+                    if (!userCancelledRef.current) {
+                      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+                      const id = toast.error(errorMessage, {
+                        duration: 8000,
+                        position: 'top-center',
+                      })
+                      errorToastIdRef.current = id
+                    }
+                  }
+                })
+              }}
+            >
+              {isMatchingActive ? (
+                <>
+                  <Spinner className="size-4" /> Matching...
+                </>
+              ) : (
+                <>
+                  <ArrowRight /> Start matching
+                </>
+              )}
+            </Button>
           </main>
         </div>
       </div>

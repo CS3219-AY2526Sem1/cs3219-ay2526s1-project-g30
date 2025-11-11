@@ -11,6 +11,7 @@
 import 'server-only';
 
 import { config } from './config';
+import { logOutgoingRequest, logIncomingResponse, logServiceError, logTiming } from './logger';
 import type {
   User,
   RegisterResponse,
@@ -50,6 +51,7 @@ async function callUserService<T>(
   auth?: string
 ): Promise<T> {
   const url = `${config.userService.baseUrl}${endpoint}`;
+  const startTime = Date.now();
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -58,6 +60,11 @@ async function callUserService<T>(
   if (auth) {
     headers.Authorization = `Bearer ${auth}`;
   }
+
+  logOutgoingRequest('userService', endpoint, method, {
+    hasAuth: !!auth,
+    timestamp: new Date().toISOString(),
+  });
 
   try {
     const controller = new AbortController();
@@ -75,12 +82,25 @@ async function callUserService<T>(
 
     clearTimeout(timeoutId);
 
+    const durationMilliseconds = Date.now() - startTime;
+
     const data = (await response.json()) as T & {
       message?: string;
       error?: string;
     };
 
+    logIncomingResponse('userService', endpoint, response.status, {
+      durationMilliseconds,
+      timestamp: new Date().toISOString(),
+    });
+
+    logTiming(`userService ${method} ${endpoint}`, durationMilliseconds);
+
     if (!response.ok) {
+      logServiceError('userService', endpoint, new Error(data.message || data.error || `HTTP ${response.status}`), {
+        statusCode: response.status,
+        method,
+      });
       throw new UserServiceError(
         data.message || data.error || `HTTP ${response.status}`,
         response.status,
@@ -95,11 +115,27 @@ async function callUserService<T>(
     }
 
     if (error instanceof TypeError) {
+      logServiceError('userService', endpoint, error, {
+        method,
+        errorType: 'TypeError',
+      });
       throw new UserServiceError(
         `Failed to connect to user service: ${error.message}`,
         undefined,
         error
       );
+    }
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      logServiceError('userService', endpoint, error, {
+        method,
+        errorType: 'AbortError (timeout)',
+      });
+    } else {
+      logServiceError('userService', endpoint, error, {
+        method,
+        errorType: 'Unexpected',
+      });
     }
 
     throw new UserServiceError(

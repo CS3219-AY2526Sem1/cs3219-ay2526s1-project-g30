@@ -6,6 +6,7 @@ import { StatusBar } from '@/components/StatusBar'
 import { EditorToolbar } from '@/components/EditorToolbar'
 import { CodeEditor } from '@/components/CodeEditor'
 import { QuestionPanel } from '@/components/QuestionPanel'
+import { ChatPanel } from '@/components/ChatPanel'
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -13,9 +14,12 @@ import {
 } from '@/components/ui/resizable'
 import { EndSessionDialog } from '@/components/EndSessionDialog'
 import { Spinner } from '@/components/ui/spinner'
-import { fetchQuestion, type Question } from '@/lib/questionServiceClient'
+import type { Question } from '@/lib/questionServiceClient'
 import { setupYJS } from '@/lib/yjs-setup'
-import { getCurrentSessionUser, terminateCollaborativeSession } from '@/app/actions/matching'
+import { createChatClient } from '@/lib/chatClient'
+import { config } from '@/lib/config'
+import type { ChatClientInstance } from '@/lib/chatClient'
+import { getCurrentSessionUser, terminateCollaborativeSession, fetchQuestionAction } from '@/app/actions/matching'
 import { toast } from 'sonner'
 
 // Map programming language names from matching service to Monaco editor language IDs
@@ -64,6 +68,8 @@ export default function MatchPage({ params }: MatchPageProps) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [questionId, setQuestionId] = useState<string | null>(null)
   const [programmingLanguage, setProgrammingLanguage] = useState<string>('javascript')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null)
   
   const [question, setQuestion] = useState<Question | null>(null)
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(true)
@@ -72,12 +78,14 @@ export default function MatchPage({ params }: MatchPageProps) {
   const [isEditorOnLeft, setIsEditorOnLeft] = useState(true)
   const [isVerticalSplit, setIsVerticalSplit] = useState(false)
   const [textSize, setTextSize] = useState(14)
+  const [isChatVisible, setIsChatVisible] = useState(true)
   const [isNavigationConfirmOpen, setIsNavigationConfirmOpen] = useState(false)
   const [isSessionTerminating, setIsSessionTerminating] = useState(false)
 
   const yjsInstanceRef = useRef<any>(null)
   const editorRef = useRef<any>(null)
   const isTerminatingRef = useRef(false)
+  const chatClientRef = useRef<ChatClientInstance | null>(null)
 
   // Extract sessionId from URL params and questionId + language from search params
   useEffect(() => {
@@ -127,11 +135,16 @@ export default function MatchPage({ params }: MatchPageProps) {
       })
 
       try {
-        const questionData = await fetchQuestion(questionId!)
-        setQuestion(questionData)
+        const result = await fetchQuestionAction(questionId!)
+        
+        if (!result.success || !result.data) {
+          throw new Error(result.error || 'Failed to fetch question')
+        }
+
+        setQuestion(result.data)
         console.log('[Match Page] Question loaded successfully:', {
-          title: questionData.title,
-          difficulty: questionData.difficulty,
+          title: result.data.title,
+          difficulty: result.data.difficulty,
         })
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to load question'
@@ -304,6 +317,65 @@ export default function MatchPage({ params }: MatchPageProps) {
     [sessionId, programmingLanguage, router]
   );
 
+  // Initialize chat client when session ID and user are available
+  // Initialize chat client when session ID and user are available
+  useEffect(() => {
+    if (!sessionId) return;
+
+    async function initializeChat() {
+      try {
+        const currentUser = await getCurrentSessionUser();
+        if (!currentUser) {
+          console.warn('[Match Page] Could not get current user for chat');
+          return;
+        }
+
+        // Store current user info for use in chat panel
+        setCurrentUserId(currentUser.userId);
+        setCurrentUsername(currentUser.username);
+
+        console.log('[Match Page] Initializing chat with user:', currentUser);
+
+        const chatClient = createChatClient({
+          sessionId: sessionId!,
+          userId: currentUser.userId,
+          username: currentUser.username,
+          wsUrl: config.collaborationService.wsUrl,
+          onConnected: () => {
+            console.log('[Match Page] Chat connected');
+            toast.success('Chat connected', { duration: 3000 });
+          },
+          onNotificationReceived: (notification: string) => {
+            console.log('[Match Page] Chat notification:', notification);
+            toast.info(notification, { duration: 5000 });
+          },
+          onError: (error: string) => {
+            // Don't show error if session is terminating
+            if (!isTerminatingRef.current) {
+              console.error('[Match Page] Chat error:', error);
+              toast.error(error, { duration: 6000 });
+            }
+          },
+          onConnectionClose: () => {
+            console.log('[Match Page] Chat connection closed');
+            // Only show toast if session is not terminating
+            if (!isTerminatingRef.current) {
+              toast.warning('Chat disconnected', { duration: 5000 });
+            }
+          },
+        });
+
+        chatClientRef.current = chatClient;
+        console.log('[Match Page] Chat client created');
+      } catch (error) {
+        console.error('[Match Page] Failed to initialize chat:', error);
+        toast.error('Failed to initialize chat', { duration: 6000 });
+      }
+    }
+
+    initializeChat();
+  }, [sessionId]);
+
   const handleSwapPanels = useCallback(() => {
     setIsEditorOnLeft((prev) => !prev)
   }, [])
@@ -322,6 +394,12 @@ export default function MatchPage({ params }: MatchPageProps) {
       if (yjsInstanceRef.current) {
         yjsInstanceRef.current.cleanup();
         yjsInstanceRef.current = null;
+      }
+
+      // Clean up chat client
+      if (chatClientRef.current) {
+        chatClientRef.current.cleanup();
+        chatClientRef.current = null;
       }
 
       // Get current user to terminate session on collab service
@@ -356,6 +434,10 @@ export default function MatchPage({ params }: MatchPageProps) {
       if (yjsInstanceRef.current) {
         yjsInstanceRef.current.cleanup();
         yjsInstanceRef.current = null;
+      }
+      if (chatClientRef.current) {
+        chatClientRef.current.cleanup();
+        chatClientRef.current = null;
       }
     };
   }, []);
@@ -431,25 +513,83 @@ export default function MatchPage({ params }: MatchPageProps) {
         textSize={textSize}
         onTextSizeChange={setTextSize}
         editorInstance={editorRef.current}
+        isChatVisible={isChatVisible}
+        onToggleChatVisibility={() => setIsChatVisible((prev) => !prev)}
       />
 
       {/* Main content area with resizable panels */}
       <div className="flex-1 overflow-hidden">
-        <ResizablePanelGroup direction={panelGroup} className="h-full">
-          {isEditorOnLeft ? (
-            <>
-              {editorPanel}
-              <ResizableHandle withHandle />
-              {questionPanel}
-            </>
-          ) : (
-            <>
-              {questionPanel}
-              <ResizableHandle withHandle />
-              {editorPanel}
-            </>
-          )}
-        </ResizablePanelGroup>
+        {isVerticalSplit ? (
+          // Vertical split: editor/question above, chat below
+          <ResizablePanelGroup direction="vertical" className="h-full">
+            <ResizablePanel defaultSize={70} minSize={30}>
+              <div className="h-full w-full overflow-hidden">
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  {isEditorOnLeft ? (
+                    <>
+                      {editorPanel}
+                      <ResizableHandle withHandle />
+                      {questionPanel}
+                    </>
+                  ) : (
+                    <>
+                      {questionPanel}
+                      <ResizableHandle withHandle />
+                      {editorPanel}
+                    </>
+                  )}
+                </ResizablePanelGroup>
+              </div>
+            </ResizablePanel>
+            {isChatVisible && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={30} minSize={20}>
+                  <ChatPanel 
+                    chatClient={chatClientRef.current || undefined} 
+                    currentUserId={currentUserId || undefined}
+                    currentUsername={currentUsername || undefined}
+                  />
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+        ) : (
+          // Horizontal split: editor/question on left, chat on right
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            <ResizablePanel defaultSize={70} minSize={30}>
+              <div className="h-full w-full overflow-hidden">
+                <ResizablePanelGroup direction={isVerticalSplit ? 'vertical' : 'horizontal'} className="h-full">
+                  {isEditorOnLeft ? (
+                    <>
+                      {editorPanel}
+                      <ResizableHandle withHandle />
+                      {questionPanel}
+                    </>
+                  ) : (
+                    <>
+                      {questionPanel}
+                      <ResizableHandle withHandle />
+                      {editorPanel}
+                    </>
+                  )}
+                </ResizablePanelGroup>
+              </div>
+            </ResizablePanel>
+            {isChatVisible && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={30} minSize={20}>
+                  <ChatPanel 
+                    chatClient={chatClientRef.current || undefined} 
+                    currentUserId={currentUserId || undefined}
+                    currentUsername={currentUsername || undefined}
+                  />
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+        )}
       </div>
 
       {/* Status Bar at bottom */}
