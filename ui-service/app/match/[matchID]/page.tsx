@@ -68,6 +68,8 @@ export default function MatchPage({ params }: MatchPageProps) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [questionId, setQuestionId] = useState<string | null>(null)
   const [programmingLanguage, setProgrammingLanguage] = useState<string>('javascript')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null)
   
   const [question, setQuestion] = useState<Question | null>(null)
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(true)
@@ -315,6 +317,7 @@ export default function MatchPage({ params }: MatchPageProps) {
   );
 
   // Initialize chat client when session ID and user are available
+  // Initialize chat client when session ID and user are available
   useEffect(() => {
     if (!sessionId) return;
 
@@ -325,6 +328,10 @@ export default function MatchPage({ params }: MatchPageProps) {
           console.warn('[Match Page] Could not get current user for chat');
           return;
         }
+
+        // Store current user info for use in chat panel
+        setCurrentUserId(currentUser.userId);
+        setCurrentUsername(currentUser.username);
 
         console.log('[Match Page] Initializing chat with user:', currentUser);
 
@@ -337,7 +344,9 @@ export default function MatchPage({ params }: MatchPageProps) {
             // Don't show error if session is terminating
             if (!isTerminatingRef.current) {
               console.error('[Match Page] Chat error:', error);
-              toast.error(error, { duration: 6000 });
+              // Only show error as toast if it's a critical failure, not transient connection issues
+              // Log for debugging but don't spam user with toasts during initial connection
+              // toast.error(error, { duration: 6000 });
             }
           },
           onConnectionClose: () => {
@@ -521,7 +530,10 @@ export default function MatchPage({ params }: MatchPageProps) {
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={30} minSize={20}>
-              <ChatPanel chatClient={chatClientRef.current || undefined} currentUserId={undefined} />
+              <ChatPanel 
+                chatClient={chatClientRef.current || undefined} 
+                currentUserId={currentUserId || undefined}
+              />
             </ResizablePanel>
           </ResizablePanelGroup>
         ) : (
@@ -548,7 +560,11 @@ export default function MatchPage({ params }: MatchPageProps) {
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={30} minSize={20}>
-              <ChatPanel chatClient={chatClientRef.current || undefined} currentUserId={undefined} />
+              <ChatPanel 
+                chatClient={chatClientRef.current || undefined} 
+                currentUserId={currentUserId || undefined}
+                currentUsername={currentUsername || undefined}
+              />
             </ResizablePanel>
           </ResizablePanelGroup>
         )}

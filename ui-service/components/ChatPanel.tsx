@@ -27,6 +27,7 @@ interface ChatPanelProps {
   onOpenChange?: (open: boolean) => void
   messages?: ChatMessageType[]
   currentUserId?: string
+  currentUsername?: string
   chatClient?: ChatClientInstance
 }
 
@@ -35,6 +36,7 @@ export function ChatPanel({
   onOpenChange,
   messages = [],
   currentUserId = 'user2',
+  currentUsername = 'user2',
   chatClient,
 }: ChatPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(!isOpen)
@@ -43,10 +45,13 @@ export function ChatPanel({
   const [sendingMessageIds, setSendingMessageIds] = useState<Set<string>>(new Set())
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
   const [isChatConnected, setIsChatConnected] = useState(false)
+  const [chatError, setChatError] = useState<string | null>(null)
   const { count: newMessageCount, increment: incrementNewMessages, reset: resetNewMessages } = useCounter(0)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatClientRef = useRef(chatClient)
+  // Track recently sent message IDs so we can clear sending state when echo-back arrives
+  const recentlySentRef = useRef<Map<string, { id: string; timestamp: number }>>(new Map())
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed)
@@ -68,18 +73,48 @@ export function ChatPanel({
     // Handle incoming messages from chat service
     chatClient.setOnMessageReceived((message: ChatMessageType) => {
       console.log('[ChatPanel] Received message from:', message.username)
+      
+      // Check if this is an echo-back of our message (compare against USERNAME, not userId)
+      const sendKey = `${currentUsername}:${message.content}`
+      const sentInfo = recentlySentRef.current.get(sendKey)
+      
+      if (sentInfo && message.username === currentUsername) {
+        // This looks like an echo-back of our message
+        const timeDiff = Date.now() - sentInfo.timestamp
+        if (timeDiff < 2000) {
+          // Clear the sending state for this message
+          console.log('[ChatPanel] Received echo-back, clearing sending state for:', sentInfo.id)
+          setSendingMessageIds((prev) => {
+            const newIds = new Set(prev)
+            newIds.delete(sentInfo.id)
+            return newIds
+          })
+          // Clean up the tracking
+          recentlySentRef.current.delete(sendKey)
+          return
+        }
+      }
+      
+      // This is a new message, add it to display
       setDisplayedMessages((prev) => [...prev, message])
     })
 
     // Track connection state
     chatClient.setOnConnected(() => {
       setIsChatConnected(true)
+      setChatError(null)
       console.log('[ChatPanel] Chat connected')
     })
 
     chatClient.setOnConnectionClose(() => {
       setIsChatConnected(false)
       console.log('[ChatPanel] Chat disconnected')
+    })
+
+    // Handle errors
+    chatClient.setOnError((error: string) => {
+      console.error('[ChatPanel] Chat error:', error)
+      setChatError(error)
     })
 
     // Connect to chat
@@ -89,7 +124,7 @@ export function ChatPanel({
     return () => {
       // Keep connection alive
     }
-  }, [chatClient])
+  }, [chatClient, currentUserId, currentUsername])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -144,14 +179,38 @@ export function ChatPanel({
 
   const handleSendMessage = useCallback((event: React.FormEvent) => {
     event.preventDefault()
-    if (inputValue.trim() && chatClientRef.current) {
+    if (inputValue.trim() && chatClientRef.current && currentUserId) {
+      // Optimistically add message to display immediately
+      const messageContent = inputValue.trim()
+      const optimisticMessageId = `optimistic-${Date.now()}-${Math.random()}`
+      const optimisticMessage: ChatMessageType = {
+        id: optimisticMessageId,
+        userId: currentUserId,
+        username: currentUsername,
+        content: messageContent,
+        timestamp: new Date(),
+        avatar: '',
+      }
+      
+      setDisplayedMessages((prevMessages) => [...prevMessages, optimisticMessage])
+      
+      // Track this as a sent message to avoid duplicates when server echoes it back
+      setSendingMessageIds((prev) => new Set([...prev, optimisticMessageId]))
+      
+      // Also track in ref for deduplication on receipt (use USERNAME for server comparison)
+      const sendKey = `${currentUsername}:${messageContent}`
+      recentlySentRef.current.set(sendKey, {
+        id: optimisticMessageId,
+        timestamp: Date.now(),
+      })
+      
       // Send message via chat client
-      chatClientRef.current.sendMessage(inputValue)
+      chatClientRef.current.sendMessage(messageContent)
       setInputValue('')
       setIsScrolledToBottom(true)
       resetNewMessages()
     }
-  }, [inputValue, resetNewMessages])
+  }, [inputValue, resetNewMessages, currentUserId])
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter') {
@@ -161,14 +220,38 @@ export function ChatPanel({
       }
       // Enter sends the message
       event.preventDefault()
-      if (inputValue.trim() && chatClientRef.current) {
-        chatClientRef.current.sendMessage(inputValue)
+      if (inputValue.trim() && chatClientRef.current && currentUserId) {
+        const messageContent = inputValue.trim()
+        const optimisticMessageId = `optimistic-${Date.now()}-${Math.random()}`
+        // Optimistically add message to display immediately
+        const optimisticMessage: ChatMessageType = {
+          id: optimisticMessageId,
+          userId: currentUserId,
+          username: currentUsername,
+          content: messageContent,
+          timestamp: new Date(),
+          avatar: '',
+        }
+        
+        setDisplayedMessages((prevMessages) => [...prevMessages, optimisticMessage])
+        
+        // Track this as a sent message to avoid duplicates when server echoes it back
+        setSendingMessageIds((prev) => new Set([...prev, optimisticMessageId]))
+        
+        // Also track in ref for deduplication on receipt (use USERNAME for server comparison)
+        const sendKey = `${currentUsername}:${messageContent}`
+        recentlySentRef.current.set(sendKey, {
+          id: optimisticMessageId,
+          timestamp: Date.now(),
+        })
+        
+        chatClientRef.current.sendMessage(messageContent)
         setInputValue('')
         setIsScrolledToBottom(true)
         resetNewMessages()
       }
     }
-  }, [inputValue, resetNewMessages])
+  }, [inputValue, resetNewMessages, currentUserId])
 
   return (
     <div className="flex h-full w-full flex-col border-l border-border bg-background overflow-hidden">
@@ -176,9 +259,11 @@ export function ChatPanel({
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold">Chat</h2>
-          {!isChatConnected && (
-            <span className="text-xs text-muted-foreground">(Disconnected)</span>
-          )}
+          {chatError ? (
+            <span className="text-xs text-destructive">(Error)</span>
+          ) : !isChatConnected ? (
+            <span className="text-xs text-muted-foreground">(Connecting...)</span>
+          ) : null}
         </div>
         <Button
           variant="ghost"
@@ -199,6 +284,11 @@ export function ChatPanel({
       {/* Messages Area */}
       {!isCollapsed && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {chatError && (
+            <div className="shrink-0 border-b border-destructive bg-destructive/10 px-4 py-2">
+              <p className="text-xs text-destructive">{chatError}</p>
+            </div>
+          )}
           <div 
             className="flex-1 overflow-y-auto"
             onScroll={handleScroll}
@@ -207,7 +297,7 @@ export function ChatPanel({
               {displayedMessages.length === 0 ? (
                 <div className="flex items-center justify-center py-8">
                   <p className="text-sm text-muted-foreground">
-                    No messages yet
+                    {chatError ? 'Connection error - messages unavailable' : 'No messages yet'}
                   </p>
                 </div>
               ) : (
@@ -262,12 +352,13 @@ export function ChatPanel({
             <form onSubmit={handleSendMessage}>
               <InputGroup>
                 <InputGroupTextarea
-                  placeholder="Type a message..."
+                  placeholder={chatError ? 'Connection error...' : 'Type a message...'}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
                   className="text-sm"
                   rows={1}
+                  disabled={!isChatConnected || !!chatError}
                 />
                 <InputGroupAddon align="block-end" className="justify-end">
                   <TooltipProvider>
@@ -277,14 +368,14 @@ export function ChatPanel({
                           size="icon-xs"
                           variant="default"
                           type="submit"
-                          disabled={!inputValue.trim()}
+                          disabled={!inputValue.trim() || !isChatConnected || !!chatError}
                           aria-label="Send message"
                         >
                           <Send className="size-3.5" />
                         </InputGroupButton>
                       </TooltipTrigger>
                       <TooltipContent side="top" sideOffset={4}>
-                        Send
+                        {!isChatConnected ? 'Connecting...' : chatError ? 'Connection error' : 'Send'}
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>

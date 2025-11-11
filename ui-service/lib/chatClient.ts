@@ -17,15 +17,15 @@ export interface ChatMessage {
 interface JoinChatMessage {
   type: 'JoinChat';
   status: 'Success' | 'Failed';
+  msg?: string;
   message?: string;
 }
 
 interface ChatMessagePayload {
   type: 'ChatMessage';
-  userid: string;
   username: string;
   content: string;
-  timestamp: string;
+  timestamp?: string;
 }
 
 interface ChatNotification {
@@ -122,31 +122,40 @@ export function createChatClient({
     isConnecting = true;
 
     try {
-      const wsProtocol = wsUrl.startsWith('ws') ? wsUrl : `ws${wsUrl.startsWith('http') ? 's' : ''}://${wsUrl}`;
-      const params = `?userid=${encodeURIComponent(userId)}&purpose=chat`;
-      const fullUrl = `${wsProtocol}/${sessionId}${params}`;
+      // Construct the WebSocket URL properly
+      // wsUrl is expected to be a full URL like 'wss://localhost:8082' or 'ws://localhost:8082'
+      let baseUrl = wsUrl;
+      
+      // If wsUrl doesn't start with ws protocol, convert http(s) to ws(s)
+      if (!baseUrl.startsWith('ws')) {
+        baseUrl = baseUrl.replace(/^https?:/, (match) => {
+          return match === 'https:' ? 'wss:' : 'ws:';
+        });
+      }
+      
+      // Remove any trailing slashes
+      baseUrl = baseUrl.replace(/\/$/, '');
+      
+      const params = `userid=${encodeURIComponent(userId)}&purpose=chat`;
+      const fullUrl = `${baseUrl}/${sessionId}?${params}`;
 
       console.log('[Chat Client] Connecting to:', {
         sessionId,
         userId,
         username,
+        baseUrl,
         url: fullUrl,
       });
 
       ws = new WebSocket(fullUrl);
 
       ws.addEventListener('open', () => {
-        console.log('[Chat Client] Connected');
+        console.log('[Chat Client] Connected to WebSocket');
         isConnecting = false;
         reconnectAttempts = 0;
 
-        // Send join chat message
-        const joinMessage = {
-          type: 'JoinChat',
-          userid: userId,
-          username: username,
-        };
-        ws!.send(JSON.stringify(joinMessage));
+        // Server will send JoinChat message immediately
+        // No need to send anything on our end
 
         if (callbacks.onConnected) {
           callbacks.onConnected();
@@ -164,19 +173,20 @@ export function createChatClient({
             if (joinMsg.status === 'Success') {
               console.log('[Chat Client] Successfully joined chat');
             } else {
-              console.error('[Chat Client] Failed to join chat:', joinMsg.message);
+              console.error('[Chat Client] Failed to join chat:', joinMsg.msg || joinMsg.message);
               if (callbacks.onError) {
-                callbacks.onError(`Failed to join chat: ${joinMsg.message || 'Unknown error'}`);
+                callbacks.onError(`Failed to join chat: ${joinMsg.msg || joinMsg.message || 'Unknown error'}`);
               }
             }
           } else if (data.type === 'ChatMessage') {
             const chatMsg = data as ChatMessagePayload;
+            // The backend doesn't send userid, so we create a message from the sender
             const message: ChatMessage = {
               id: `${Date.now()}-${Math.random()}`,
-              userId: chatMsg.userid,
+              userId: chatMsg.username, // Use username as userId since backend doesn't send it
               username: chatMsg.username,
               content: chatMsg.content,
-              timestamp: new Date(chatMsg.timestamp),
+              timestamp: new Date(),
             };
 
             console.log('[Chat Client] Chat message received:', {
@@ -201,11 +211,15 @@ export function createChatClient({
       });
 
       ws.addEventListener('error', (event) => {
-        console.error('[Chat Client] WebSocket error:', event);
+        console.error('[Chat Client] WebSocket error:', {
+          readyState: ws?.readyState,
+          url: ws?.url,
+          error: event,
+        });
         isConnecting = false;
 
         if (callbacks.onError) {
-          callbacks.onError('Chat connection error. Please refresh the page.');
+          callbacks.onError('Chat connection error. Please check your connection and refresh the page.');
         }
       });
 
@@ -292,12 +306,10 @@ export function createChatClient({
     }
 
     try {
+      // Backend expects 'SendMsg' type, not 'ChatMessage'
       const message = {
-        type: 'ChatMessage',
-        userid: userId,
-        username: username,
+        type: 'SendMsg',
         content: content,
-        timestamp: new Date().toISOString(),
       };
 
       console.log('[Chat Client] Sending message:', {
