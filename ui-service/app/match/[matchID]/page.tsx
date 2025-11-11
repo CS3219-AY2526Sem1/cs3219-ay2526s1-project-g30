@@ -6,6 +6,7 @@ import { StatusBar } from '@/components/StatusBar'
 import { EditorToolbar } from '@/components/EditorToolbar'
 import { CodeEditor } from '@/components/CodeEditor'
 import { QuestionPanel } from '@/components/QuestionPanel'
+import { ChatPanel } from '@/components/ChatPanel'
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -15,6 +16,9 @@ import { EndSessionDialog } from '@/components/EndSessionDialog'
 import { Spinner } from '@/components/ui/spinner'
 import type { Question } from '@/lib/questionServiceClient'
 import { setupYJS } from '@/lib/yjs-setup'
+import { createChatClient } from '@/lib/chatClient'
+import { config } from '@/lib/config'
+import type { ChatClientInstance } from '@/lib/chatClient'
 import { getCurrentSessionUser, terminateCollaborativeSession, fetchQuestionAction } from '@/app/actions/matching'
 import { toast } from 'sonner'
 
@@ -78,6 +82,7 @@ export default function MatchPage({ params }: MatchPageProps) {
   const yjsInstanceRef = useRef<any>(null)
   const editorRef = useRef<any>(null)
   const isTerminatingRef = useRef(false)
+  const chatClientRef = useRef<ChatClientInstance | null>(null)
 
   // Extract sessionId from URL params and questionId + language from search params
   useEffect(() => {
@@ -309,6 +314,48 @@ export default function MatchPage({ params }: MatchPageProps) {
     [sessionId, programmingLanguage, router]
   );
 
+  // Initialize chat client when session ID and user are available
+  useEffect(() => {
+    if (!sessionId) return;
+
+    async function initializeChat() {
+      try {
+        const currentUser = await getCurrentSessionUser();
+        if (!currentUser) {
+          console.warn('[Match Page] Could not get current user for chat');
+          return;
+        }
+
+        console.log('[Match Page] Initializing chat with user:', currentUser);
+
+        const chatClient = createChatClient({
+          sessionId: sessionId!,
+          userId: currentUser.userId,
+          username: currentUser.username,
+          wsUrl: config.collaborationService.wsUrl,
+          onError: (error: string) => {
+            // Don't show error if session is terminating
+            if (!isTerminatingRef.current) {
+              console.error('[Match Page] Chat error:', error);
+              toast.error(error, { duration: 6000 });
+            }
+          },
+          onConnectionClose: () => {
+            console.log('[Match Page] Chat connection closed');
+          },
+        });
+
+        chatClientRef.current = chatClient;
+        console.log('[Match Page] Chat client created');
+      } catch (error) {
+        console.error('[Match Page] Failed to initialize chat:', error);
+        toast.error('Failed to initialize chat', { duration: 6000 });
+      }
+    }
+
+    initializeChat();
+  }, [sessionId]);
+
   const handleSwapPanels = useCallback(() => {
     setIsEditorOnLeft((prev) => !prev)
   }, [])
@@ -327,6 +374,12 @@ export default function MatchPage({ params }: MatchPageProps) {
       if (yjsInstanceRef.current) {
         yjsInstanceRef.current.cleanup();
         yjsInstanceRef.current = null;
+      }
+
+      // Clean up chat client
+      if (chatClientRef.current) {
+        chatClientRef.current.cleanup();
+        chatClientRef.current = null;
       }
 
       // Get current user to terminate session on collab service
@@ -361,6 +414,10 @@ export default function MatchPage({ params }: MatchPageProps) {
       if (yjsInstanceRef.current) {
         yjsInstanceRef.current.cleanup();
         yjsInstanceRef.current = null;
+      }
+      if (chatClientRef.current) {
+        chatClientRef.current.cleanup();
+        chatClientRef.current = null;
       }
     };
   }, []);
@@ -440,21 +497,61 @@ export default function MatchPage({ params }: MatchPageProps) {
 
       {/* Main content area with resizable panels */}
       <div className="flex-1 overflow-hidden">
-        <ResizablePanelGroup direction={panelGroup} className="h-full">
-          {isEditorOnLeft ? (
-            <>
-              {editorPanel}
-              <ResizableHandle withHandle />
-              {questionPanel}
-            </>
-          ) : (
-            <>
-              {questionPanel}
-              <ResizableHandle withHandle />
-              {editorPanel}
-            </>
-          )}
-        </ResizablePanelGroup>
+        {isVerticalSplit ? (
+          // Vertical split: editor/question above, chat below
+          <ResizablePanelGroup direction="vertical" className="h-full">
+            <ResizablePanel defaultSize={70} minSize={30}>
+              <div className="h-full w-full overflow-hidden">
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  {isEditorOnLeft ? (
+                    <>
+                      {editorPanel}
+                      <ResizableHandle withHandle />
+                      {questionPanel}
+                    </>
+                  ) : (
+                    <>
+                      {questionPanel}
+                      <ResizableHandle withHandle />
+                      {editorPanel}
+                    </>
+                  )}
+                </ResizablePanelGroup>
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={30} minSize={20}>
+              <ChatPanel chatClient={chatClientRef.current || undefined} currentUserId={undefined} />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          // Horizontal split: editor/question on left, chat on right
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            <ResizablePanel defaultSize={70} minSize={30}>
+              <div className="h-full w-full overflow-hidden">
+                <ResizablePanelGroup direction={isVerticalSplit ? 'vertical' : 'horizontal'} className="h-full">
+                  {isEditorOnLeft ? (
+                    <>
+                      {editorPanel}
+                      <ResizableHandle withHandle />
+                      {questionPanel}
+                    </>
+                  ) : (
+                    <>
+                      {questionPanel}
+                      <ResizableHandle withHandle />
+                      {editorPanel}
+                    </>
+                  )}
+                </ResizablePanelGroup>
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={30} minSize={20}>
+              <ChatPanel chatClient={chatClientRef.current || undefined} currentUserId={undefined} />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
       </div>
 
       {/* Status Bar at bottom */}

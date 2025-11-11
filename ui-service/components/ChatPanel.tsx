@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { ChevronDown, Send, ChevronDown as ChevronDownIcon } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -20,21 +20,14 @@ import {
 import { useCounter } from '@/hooks/use-counter'
 import { cn } from '@/lib/utils'
 import { ChatMessage } from '@/components/ChatMessage'
-
-interface ChatMessage {
-  id: string
-  userId: string
-  username: string
-  avatar?: string
-  content: string
-  timestamp: Date
-}
+import type { ChatClientInstance, ChatMessage as ChatMessageType } from '@/lib/chatClient'
 
 interface ChatPanelProps {
   isOpen?: boolean
   onOpenChange?: (open: boolean) => void
-  messages?: ChatMessage[]
+  messages?: ChatMessageType[]
   currentUserId?: string
+  chatClient?: ChatClientInstance
 }
 
 export function ChatPanel({
@@ -42,20 +35,61 @@ export function ChatPanel({
   onOpenChange,
   messages = [],
   currentUserId = 'user2',
+  chatClient,
 }: ChatPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(!isOpen)
   const [inputValue, setInputValue] = useState('')
-  const [displayedMessages, setDisplayedMessages] = useState<ChatMessage[]>(messages)
+  const [displayedMessages, setDisplayedMessages] = useState<ChatMessageType[]>(messages)
   const [sendingMessageIds, setSendingMessageIds] = useState<Set<string>>(new Set())
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
+  const [isChatConnected, setIsChatConnected] = useState(false)
   const { count: newMessageCount, increment: incrementNewMessages, reset: resetNewMessages } = useCounter(0)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const chatClientRef = useRef(chatClient)
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed)
     onOpenChange?.(!isCollapsed)
   }
+
+  // Update chat client ref when it changes
+  useEffect(() => {
+    chatClientRef.current = chatClient
+  }, [chatClient])
+
+  // Set up chat client connection and message listeners
+  useEffect(() => {
+    if (!chatClient) {
+      console.log('[ChatPanel] No chat client provided')
+      return
+    }
+
+    // Handle incoming messages from chat service
+    chatClient.setOnMessageReceived((message: ChatMessageType) => {
+      console.log('[ChatPanel] Received message from:', message.username)
+      setDisplayedMessages((prev) => [...prev, message])
+    })
+
+    // Track connection state
+    chatClient.setOnConnected(() => {
+      setIsChatConnected(true)
+      console.log('[ChatPanel] Chat connected')
+    })
+
+    chatClient.setOnConnectionClose(() => {
+      setIsChatConnected(false)
+      console.log('[ChatPanel] Chat disconnected')
+    })
+
+    // Connect to chat
+    chatClient.connect()
+
+    // Cleanup: don't disconnect on unmount since the chat might still be needed
+    return () => {
+      // Keep connection alive
+    }
+  }, [chatClient])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -108,35 +142,18 @@ export function ChatPanel({
     }
   }, [displayedMessages.length, isScrolledToBottom])
 
-  const handleSendMessage = (event: React.FormEvent) => {
+  const handleSendMessage = useCallback((event: React.FormEvent) => {
     event.preventDefault()
-    if (inputValue.trim()) {
-      const messageId = `msg-${Date.now()}`
-      const newMessage: ChatMessage = {
-        id: messageId,
-        userId: currentUserId,
-        username: 'You',
-        content: inputValue,
-        timestamp: new Date(),
-      }
-      setDisplayedMessages([...displayedMessages, newMessage])
-      setSendingMessageIds((prev) => new Set([...prev, messageId]))
+    if (inputValue.trim() && chatClientRef.current) {
+      // Send message via chat client
+      chatClientRef.current.sendMessage(inputValue)
       setInputValue('')
       setIsScrolledToBottom(true)
       resetNewMessages()
-
-      // Simulate sending delay (remove from sending state after 1 second)
-      setTimeout(() => {
-        setSendingMessageIds((prev) => {
-          const updated = new Set(prev)
-          updated.delete(messageId)
-          return updated
-        })
-      }, 1000)
     }
-  }
+  }, [inputValue, resetNewMessages])
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter') {
       if (event.shiftKey) {
         // Shift+Enter allows new line (default textarea behaviour)
@@ -144,76 +161,39 @@ export function ChatPanel({
       }
       // Enter sends the message
       event.preventDefault()
-      if (inputValue.trim()) {
-        const messageId = `msg-${Date.now()}`
-        const newMessage: ChatMessage = {
-          id: messageId,
-          userId: currentUserId,
-          username: 'You',
-          content: inputValue,
-          timestamp: new Date(),
-        }
-        setDisplayedMessages([...displayedMessages, newMessage])
-        setSendingMessageIds((prev) => new Set([...prev, messageId]))
+      if (inputValue.trim() && chatClientRef.current) {
+        chatClientRef.current.sendMessage(inputValue)
         setInputValue('')
         setIsScrolledToBottom(true)
         resetNewMessages()
-
-        // Simulate sending delay (remove from sending state after 1 second)
-        setTimeout(() => {
-          setSendingMessageIds((prev) => {
-            const updated = new Set(prev)
-            updated.delete(messageId)
-            return updated
-          })
-        }, 1000)
       }
     }
-  }
-
-  const mockReceiveMessage = () => {
-    const mockMessage: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      userId: 'user1',
-      username: 'Alice',
-      content: 'This is a mock message from the other user!',
-      timestamp: new Date(),
-    }
-    setDisplayedMessages([...displayedMessages, mockMessage])
-    // Don't call incrementNewMessages here - let the effect handle it
-  }
+  }, [inputValue, resetNewMessages])
 
   return (
     <div className="flex h-full w-full flex-col border-l border-border bg-background overflow-hidden">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold">Chat</h2>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            onClick={mockReceiveMessage}
-            aria-label="Mock receive message"
-            title="Mock receiving a message"
-          >
-            <Send className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            onClick={toggleCollapse}
-            aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-          >
-            <ChevronDown
-              className={cn(
-                'size-4 transition-transform duration-200',
-                isCollapsed && 'rotate-180'
-              )}
-            />
-          </Button>
+          <h2 className="text-sm font-semibold">Chat</h2>
+          {!isChatConnected && (
+            <span className="text-xs text-muted-foreground">(Disconnected)</span>
+          )}
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={toggleCollapse}
+          aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+        >
+          <ChevronDown
+            className={cn(
+              'size-4 transition-transform duration-200',
+              isCollapsed && 'rotate-180'
+            )}
+          />
+        </Button>
       </div>
 
       {/* Messages Area */}
