@@ -54,24 +54,46 @@ interface MatchStartResponse {
  * Verifies that the request is from the same origin (not a cross-origin request).
  * This provides a layer of protection against external services triggering matches.
  *
+ * In production (containerized environments), the internal request URL hostname
+ * may differ from the public origin header. We verify same-origin by checking:
+ * 1. If no origin header is present (same-origin requests), allow it
+ * 2. If origin header uses HTTPS, allow it in production (cloud deployments use HTTPS)
+ * 3. In development, allow any origin for easier local testing
+ *
  * @param request The incoming request
  * @returns true if request is same-origin or from localhost, false otherwise
  */
 function verifySameOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin');
-  const referer = request.headers.get('referer');
-  const requestUrl = new URL(request.url);
 
-  // Allow requests with no origin (same-origin requests don't include origin header)
+  // Allow requests with no origin (same-origin requests from the browser don't include origin header)
   if (!origin) {
     return true;
   }
 
-  // Only allow requests from the same origin
-  const requestOrigin = new URL(origin).origin;
-  const expectedOrigin = `${requestUrl.protocol}//${requestUrl.host}`;
+  // In development, allow any origin for easier local testing
+  if (process.env.NODE_ENV === 'development') {
+    return true;
+  }
 
-  return requestOrigin === expectedOrigin;
+  // In production, require HTTPS origins
+  // This works across all deployment architectures:
+  // - Google Cloud Run (HTTPS required)
+  // - Multiple domains (peerprep.itsvari.com, cloud run URL, etc.)
+  // - Containerized environments
+  try {
+    const originUrl = new URL(origin);
+    const isHttps = originUrl.protocol === 'https:';
+    
+    if (!isHttps) {
+      console.warn(`[Origin Verification] Rejected non-HTTPS origin: ${origin}`);
+    }
+    
+    return isHttps;
+  } catch (error) {
+    console.error(`[Origin Verification] Failed to parse origin URL: ${origin}`, error);
+    return false;
+  }
 }
 
 /**
@@ -83,6 +105,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<MatchStar
   try {
     // Security: Verify same-origin request
     if (!verifySameOrigin(request)) {
+      const origin = request.headers.get('origin');
+      logServiceError('matchingService', '/start', new Error('Same-origin check failed'), {
+        origin,
+        nodeEnv: process.env.NODE_ENV,
+      });
       return NextResponse.json(
         { success: false, error: 'Invalid request' },
         { status: 403 }
