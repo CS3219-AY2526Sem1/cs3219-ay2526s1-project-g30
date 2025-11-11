@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Spinner } from '@/components/ui/spinner'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 import { cn } from '@/lib/utils'
@@ -42,15 +42,13 @@ export function ChatMessage({
         <div className={cn('flex items-center gap-2', isCurrentUser && 'justify-end')}>
           {isCurrentUser ? (
             <>
-              <span
-                className="text-xs text-primary/70 flex items-center align-middle gap-1"
-                suppressHydrationWarning
-              >
+              <span className="text-xs text-primary/70 flex items-center align-middle gap-1">
                 {isSending && <Spinner className="size-3" />}
                 {formattedTime}
               </span>
               <span className="text-sm font-medium flex items-center align-middle">You</span>
               <Avatar className="size-6 flex items-center justify-center align-middle">
+                {avatar && <AvatarImage src={avatar} alt={username} />}
                 <AvatarFallback className="text-xs">
                   {username.charAt(0).toUpperCase()}
                 </AvatarFallback>
@@ -59,15 +57,13 @@ export function ChatMessage({
           ) : (
             <>
               <Avatar className="size-6 flex items-center justify-center align-middle">
+                {avatar && <AvatarImage src={avatar} alt={username} />}
                 <AvatarFallback className="text-xs">
                   {username.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm font-medium flex items-center align-middle">{username}</span>
-              <span
-                className="text-xs text-muted-foreground flex items-center align-middle"
-                suppressHydrationWarning
-              >
+              <span className="text-xs text-muted-foreground flex items-center align-middle">
                 {formattedTime}
               </span>
             </>

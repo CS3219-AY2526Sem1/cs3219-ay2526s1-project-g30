@@ -78,6 +78,7 @@ export default function MatchPage({ params }: MatchPageProps) {
   const [isEditorOnLeft, setIsEditorOnLeft] = useState(true)
   const [isVerticalSplit, setIsVerticalSplit] = useState(false)
   const [textSize, setTextSize] = useState(14)
+  const [isChatVisible, setIsChatVisible] = useState(true)
   const [isNavigationConfirmOpen, setIsNavigationConfirmOpen] = useState(false)
   const [isSessionTerminating, setIsSessionTerminating] = useState(false)
 
@@ -340,17 +341,27 @@ export default function MatchPage({ params }: MatchPageProps) {
           userId: currentUser.userId,
           username: currentUser.username,
           wsUrl: config.collaborationService.wsUrl,
+          onConnected: () => {
+            console.log('[Match Page] Chat connected');
+            toast.success('Chat connected', { duration: 3000 });
+          },
+          onNotificationReceived: (notification: string) => {
+            console.log('[Match Page] Chat notification:', notification);
+            toast.info(notification, { duration: 5000 });
+          },
           onError: (error: string) => {
             // Don't show error if session is terminating
             if (!isTerminatingRef.current) {
               console.error('[Match Page] Chat error:', error);
-              // Only show error as toast if it's a critical failure, not transient connection issues
-              // Log for debugging but don't spam user with toasts during initial connection
-              // toast.error(error, { duration: 6000 });
+              toast.error(error, { duration: 6000 });
             }
           },
           onConnectionClose: () => {
             console.log('[Match Page] Chat connection closed');
+            // Only show toast if session is not terminating
+            if (!isTerminatingRef.current) {
+              toast.warning('Chat disconnected', { duration: 5000 });
+            }
           },
         });
 
@@ -502,6 +513,8 @@ export default function MatchPage({ params }: MatchPageProps) {
         textSize={textSize}
         onTextSizeChange={setTextSize}
         editorInstance={editorRef.current}
+        isChatVisible={isChatVisible}
+        onToggleChatVisibility={() => setIsChatVisible((prev) => !prev)}
       />
 
       {/* Main content area with resizable panels */}
@@ -528,13 +541,18 @@ export default function MatchPage({ params }: MatchPageProps) {
                 </ResizablePanelGroup>
               </div>
             </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={30} minSize={20}>
-              <ChatPanel 
-                chatClient={chatClientRef.current || undefined} 
-                currentUserId={currentUserId || undefined}
-              />
-            </ResizablePanel>
+            {isChatVisible && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={30} minSize={20}>
+                  <ChatPanel 
+                    chatClient={chatClientRef.current || undefined} 
+                    currentUserId={currentUserId || undefined}
+                    currentUsername={currentUsername || undefined}
+                  />
+                </ResizablePanel>
+              </>
+            )}
           </ResizablePanelGroup>
         ) : (
           // Horizontal split: editor/question on left, chat on right
@@ -558,14 +576,18 @@ export default function MatchPage({ params }: MatchPageProps) {
                 </ResizablePanelGroup>
               </div>
             </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={30} minSize={20}>
-              <ChatPanel 
-                chatClient={chatClientRef.current || undefined} 
-                currentUserId={currentUserId || undefined}
-                currentUsername={currentUsername || undefined}
-              />
-            </ResizablePanel>
+            {isChatVisible && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={30} minSize={20}>
+                  <ChatPanel 
+                    chatClient={chatClientRef.current || undefined} 
+                    currentUserId={currentUserId || undefined}
+                    currentUsername={currentUsername || undefined}
+                  />
+                </ResizablePanel>
+              </>
+            )}
           </ResizablePanelGroup>
         )}
       </div>

@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { ChevronDown, Send, ChevronDown as ChevronDownIcon } from 'lucide-react'
+import { Send, ChevronDown as ChevronDownIcon } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 import {
   InputGroup,
   InputGroupAddon,
@@ -19,6 +20,7 @@ import {
 } from '@/components/ui/tooltip'
 import { useCounter } from '@/hooks/use-counter'
 import { cn } from '@/lib/utils'
+import { getUserAvatarUrl } from '@/lib/userProfileCache'
 import { ChatMessage } from '@/components/ChatMessage'
 import type { ChatClientInstance, ChatMessage as ChatMessageType } from '@/lib/chatClient'
 
@@ -35,17 +37,17 @@ export function ChatPanel({
   isOpen = true,
   onOpenChange,
   messages = [],
-  currentUserId = 'user2',
-  currentUsername = 'user2',
+  currentUserId,
+  currentUsername,
   chatClient,
 }: ChatPanelProps) {
-  const [isCollapsed, setIsCollapsed] = useState(!isOpen)
   const [inputValue, setInputValue] = useState('')
   const [displayedMessages, setDisplayedMessages] = useState<ChatMessageType[]>(messages)
   const [sendingMessageIds, setSendingMessageIds] = useState<Set<string>>(new Set())
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
   const [isChatConnected, setIsChatConnected] = useState(false)
   const [chatError, setChatError] = useState<string | null>(null)
+  const [currentUserAvatar, setCurrentUserAvatar] = useState<string>('')
   const { count: newMessageCount, increment: incrementNewMessages, reset: resetNewMessages } = useCounter(0)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -53,15 +55,25 @@ export function ChatPanel({
   // Track recently sent message IDs so we can clear sending state when echo-back arrives
   const recentlySentRef = useRef<Map<string, { id: string; timestamp: number }>>(new Map())
 
-  const toggleCollapse = () => {
-    setIsCollapsed(!isCollapsed)
-    onOpenChange?.(!isCollapsed)
-  }
-
   // Update chat client ref when it changes
   useEffect(() => {
     chatClientRef.current = chatClient
   }, [chatClient])
+
+  // Fetch current user's avatar
+  useEffect(() => {
+    if (!currentUsername) {
+      return
+    }
+    
+    getUserAvatarUrl(currentUsername)
+      .then((avatarUrl) => {
+        setCurrentUserAvatar(avatarUrl || '')
+      })
+      .catch((error) => {
+        console.error('[ChatPanel] Failed to fetch current user avatar:', error)
+      })
+  }, [currentUsername])
 
   // Set up chat client connection and message listeners
   useEffect(() => {
@@ -95,7 +107,20 @@ export function ChatPanel({
         }
       }
       
-      // This is a new message, add it to display
+      // Fetch avatar URL asynchronously and update the message
+      const messageId = message.id
+      getUserAvatarUrl(message.username).then((avatarUrl) => {
+        setDisplayedMessages((prev) => 
+          prev.map((msg) => 
+            msg.id === messageId ? { ...msg, avatar: avatarUrl || '' } : msg
+          )
+        )
+      }).catch((error) => {
+        console.error('[ChatPanel] Failed to fetch avatar for', message.username, error)
+        // Still add the message even if avatar fetch fails
+      })
+      
+      // Add the message immediately without avatar, it will be updated when avatar is fetched
       setDisplayedMessages((prev) => [...prev, message])
     })
 
@@ -111,10 +136,17 @@ export function ChatPanel({
       console.log('[ChatPanel] Chat disconnected')
     })
 
+    // Handle notifications from other users (e.g., user joined, user left)
+    chatClient.setOnNotificationReceived((notification: string) => {
+      console.log('[ChatPanel] Notification:', notification)
+      toast.info(notification, { duration: 5000 })
+    })
+
     // Handle errors
     chatClient.setOnError((error: string) => {
       console.error('[ChatPanel] Chat error:', error)
       setChatError(error)
+      toast.error(error, { duration: 6000 })
     })
 
     // Connect to chat
@@ -179,7 +211,7 @@ export function ChatPanel({
 
   const handleSendMessage = useCallback((event: React.FormEvent) => {
     event.preventDefault()
-    if (inputValue.trim() && chatClientRef.current && currentUserId) {
+    if (inputValue.trim() && chatClientRef.current && currentUserId && currentUsername) {
       // Optimistically add message to display immediately
       const messageContent = inputValue.trim()
       const optimisticMessageId = `optimistic-${Date.now()}-${Math.random()}`
@@ -189,7 +221,7 @@ export function ChatPanel({
         username: currentUsername,
         content: messageContent,
         timestamp: new Date(),
-        avatar: '',
+        avatar: currentUserAvatar,
       }
       
       setDisplayedMessages((prevMessages) => [...prevMessages, optimisticMessage])
@@ -210,7 +242,7 @@ export function ChatPanel({
       setIsScrolledToBottom(true)
       resetNewMessages()
     }
-  }, [inputValue, resetNewMessages, currentUserId])
+  }, [inputValue, resetNewMessages, currentUserId, currentUsername, currentUserAvatar])
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter') {
@@ -220,7 +252,7 @@ export function ChatPanel({
       }
       // Enter sends the message
       event.preventDefault()
-      if (inputValue.trim() && chatClientRef.current && currentUserId) {
+      if (inputValue.trim() && chatClientRef.current && currentUserId && currentUsername) {
         const messageContent = inputValue.trim()
         const optimisticMessageId = `optimistic-${Date.now()}-${Math.random()}`
         // Optimistically add message to display immediately
@@ -230,7 +262,7 @@ export function ChatPanel({
           username: currentUsername,
           content: messageContent,
           timestamp: new Date(),
-          avatar: '',
+          avatar: currentUserAvatar,
         }
         
         setDisplayedMessages((prevMessages) => [...prevMessages, optimisticMessage])
@@ -251,39 +283,12 @@ export function ChatPanel({
         resetNewMessages()
       }
     }
-  }, [inputValue, resetNewMessages, currentUserId])
+  }, [inputValue, resetNewMessages, currentUserId, currentUsername, currentUserAvatar])
 
   return (
     <div className="flex h-full w-full flex-col border-l border-border bg-background overflow-hidden">
-      {/* Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold">Chat</h2>
-          {chatError ? (
-            <span className="text-xs text-destructive">(Error)</span>
-          ) : !isChatConnected ? (
-            <span className="text-xs text-muted-foreground">(Connecting...)</span>
-          ) : null}
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          onClick={toggleCollapse}
-          aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-        >
-          <ChevronDown
-            className={cn(
-              'size-4 transition-transform duration-200',
-              isCollapsed && 'rotate-180'
-            )}
-          />
-        </Button>
-      </div>
-
       {/* Messages Area */}
-      {!isCollapsed && (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {chatError && (
             <div className="shrink-0 border-b border-destructive bg-destructive/10 px-4 py-2">
               <p className="text-xs text-destructive">{chatError}</p>
@@ -293,9 +298,9 @@ export function ChatPanel({
             className="flex-1 overflow-y-auto"
             onScroll={handleScroll}
           >
-            <div className="flex flex-col gap-3 items-start px-2 py-4 w-full">
+            <div className="flex flex-col gap-3 items-start px-2 py-4 w-full h-full">
               {displayedMessages.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
+                <div className="flex items-center justify-center w-full h-full">
                   <p className="text-sm text-muted-foreground">
                     {chatError ? 'Connection error - messages unavailable' : 'No messages yet'}
                   </p>
@@ -384,7 +389,6 @@ export function ChatPanel({
             </form>
           </div>
         </div>
-      )}
     </div>
   )
 }
