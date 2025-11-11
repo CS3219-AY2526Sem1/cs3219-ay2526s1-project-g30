@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { SocialLinkDisplay } from './SocialLinkDisplay';
+import { SocialLinkDisplay } from '../SocialLinkDisplay';
 import { SocialLink } from '@/types/social';
 
 describe('SocialLinkDisplay component', () => {

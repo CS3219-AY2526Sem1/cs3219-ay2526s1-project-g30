@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ChatMessage } from './ChatMessage';
+import { ChatMessage } from '../ChatMessage';
 
 describe('ChatMessage component', () => {
   const defaultProps = {

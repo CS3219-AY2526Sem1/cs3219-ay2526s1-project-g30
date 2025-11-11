@@ -19,7 +19,7 @@ describe('config module', () => {
     vi.resetModules();
     
     // Re-import to get fresh config with new env vars
-    const { config } = await import('./config');
+    const { config } = await import('../config');
     
     expect(config.environment).toBe('development');
     expect(config.isDevelopment).toBe(true);
@@ -28,7 +28,7 @@ describe('config module', () => {
 
   it('provides session configuration with defaults', async () => {
     vi.resetModules();
-    const { config } = await import('./config');
+    const { config } = await import('../config');
     
     expect(config.session.secret).toBeDefined();
     expect(config.session.expiresInDays).toBe(7);
@@ -37,7 +37,7 @@ describe('config module', () => {
 
   it('provides user service configuration with defaults', async () => {
     vi.resetModules();
-    const { config } = await import('./config');
+    const { config } = await import('../config');
     
     expect(config.userService.baseUrl).toBe('http://localhost:3001/api/users');
     expect(config.userService.timeout).toBe(10000);
@@ -45,7 +45,7 @@ describe('config module', () => {
 
   it('provides matching service configuration with defaults', async () => {
     vi.resetModules();
-    const { config } = await import('./config');
+    const { config } = await import('../config');
     
     expect(config.matchingService.baseUrl).toBe('http://localhost:8080/api/v1');
     expect(config.matchingService.timeoutSeconds).toBe(30);
@@ -54,7 +54,7 @@ describe('config module', () => {
 
   it('provides question service configuration with defaults', async () => {
     vi.resetModules();
-    const { config } = await import('./config');
+    const { config } = await import('../config');
     
     expect(config.questionService.baseUrl).toBe('http://localhost:3002');
     expect(config.questionService.timeout).toBe(10000);
@@ -62,7 +62,7 @@ describe('config module', () => {
 
   it('provides collaboration service configuration with defaults', async () => {
     vi.resetModules();
-    const { config } = await import('./config');
+    const { config } = await import('../config');
     
     expect(config.collaborationService.baseUrl).toBe('http://localhost:8082');
     expect(config.collaborationService.wsUrl).toBe('wss://localhost:8082');
@@ -70,7 +70,7 @@ describe('config module', () => {
 
   it('provides feature flags with defaults', async () => {
     vi.resetModules();
-    const { config } = await import('./config');
+    const { config } = await import('../config');
     
     expect(config.features.enableAuthentication).toBe(true);
   });
@@ -81,7 +81,7 @@ describe('config module', () => {
     process.env.NEXT_PUBLIC_USER_SERVICE_URL = 'https://api.example.com/users';
     
     vi.resetModules();
-    const { config } = await import('./config');
+    const { config } = await import('../config');
     
     expect(config.session.secret).toBe('custom-secret');
     expect(config.session.expiresInDays).toBe(14);
@@ -92,7 +92,7 @@ describe('config module', () => {
     process.env.FEATURE_AUTH_ENABLED = 'false';
     
     vi.resetModules();
-    const { config } = await import('./config');
+    const { config } = await import('../config');
     
     expect(config.features.enableAuthentication).toBe(false);
   });

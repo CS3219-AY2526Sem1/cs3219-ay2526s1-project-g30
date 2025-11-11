@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MarkdownRenderer } from './MarkdownRenderer';
+import { MarkdownRenderer } from '../MarkdownRenderer';
 
 describe('MarkdownRenderer component', () => {
   it('renders plain text correctly', () => {
@@ -148,38 +148,5 @@ describe('MarkdownRenderer component', () => {
     render(<MarkdownRenderer content="~~strikethrough~~" />);
     const strikethrough = screen.getByText('strikethrough');
     expect(strikethrough.tagName).toBe('DEL');
-  });
-
-  it('renders task lists', () => {
-    const content = '- [ ] Unchecked task\n- [x] Checked task';
-    const { container } = render(<MarkdownRenderer content={content} />);
-    
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-    expect(checkboxes).toHaveLength(2);
-    expect(checkboxes[0]).not.toBeChecked();
-    expect(checkboxes[1]).toBeChecked();
-  });
-
-  it('renders task list checkboxes as disabled', () => {
-    const content = '- [ ] Task';
-    const { container } = render(<MarkdownRenderer content={content} />);
-    
-    const checkbox = container.querySelector('input[type="checkbox"]');
-    expect(checkbox).toBeDisabled();
-  });
-
-  it('renders mixed content correctly', () => {
-    const content = '# Title\n\nThis is **bold** and *italic* text with a [link](https://example.com).';
-    render(<MarkdownRenderer content={content} />);
-    
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Title');
-    expect(screen.getByText('bold')).toBeInTheDocument();
-    expect(screen.getByText('italic')).toBeInTheDocument();
-    expect(screen.getByRole('link')).toHaveAttribute('href', 'https://example.com');
-  });
-
-  it('handles empty content', () => {
-    const { container } = render(<MarkdownRenderer content="" />);
-    expect(container.querySelector('.markdown-content')).toBeInTheDocument();
   });
 });

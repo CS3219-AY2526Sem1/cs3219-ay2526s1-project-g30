@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ViewContent } from './ViewContent';
+import { ViewContent } from '../ViewContent';
 
 describe('ViewContent component', () => {
   it('renders children correctly', () => {
