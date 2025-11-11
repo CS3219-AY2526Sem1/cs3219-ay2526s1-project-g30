@@ -1,4 +1,13 @@
 steps:
+  - name: node:24
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        cd ui-service && \
+        npm ci && \
+        npm run test
+    id: Test
   - name: gcr.io/cloud-builders/docker
     entrypoint: bash
     args:
@@ -17,12 +26,14 @@ steps:
           ui-service
     id: Build
     secretEnv: ['SESSION_SECRET', 'NEXT_PUBLIC_USER_SERVICE_URL', 'NEXT_PUBLIC_MATCHING_SERVICE_URL', 'NEXT_PUBLIC_QUESTION_SERVICE_URL', 'NEXT_PUBLIC_COLLAB_SERVICE_URL', 'NEXT_PUBLIC_COLLAB_SERVICE_WS_URL']
+    waitFor: ['Test']
   - name: gcr.io/cloud-builders/docker
     args:
       - push
       - >-
         $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
     id: Push
+    waitFor: ['Build']
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
     args:
       - run
@@ -38,6 +49,7 @@ steps:
       - '--quiet'
     id: Deploy
     entrypoint: gcloud
+    waitFor: ['Push']
 
 images:
   - >-
