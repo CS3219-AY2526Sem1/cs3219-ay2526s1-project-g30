@@ -37,6 +37,43 @@ PeerPrep is an online learning platform designed to help new coders grow through
 | Go | latest | For matching-service |
 | Docker | latest | Running containers |
 
+## .env Setup
+Each microservice uses its own configured environment variables. To run the services locally, you will need to create the following .env files and supply the your own values.
+
+If running locally, use `http://localhost:<insert PORT>` for each microservice.
+
+### /user-service/.env
+```
+
+```
+
+### /matching-service/.env
+```
+COLLAB_SERVICE_URL: "<insert URL>"
+QUESTION_SERVICE_URL: "<insert URL>"
+```
+Default port for collab service is `1234`.
+
+### /question-service/.env
+```
+MONGO_URI="<insert URL>"
+USER_SERVICE_URL="<insert URL>"
+```
+
+### /collab-service/collab-server/.env
+```
+MONGO_DB_URL = "<insert URL>"
+SESSION_TIMEOUT = '3600000'
+SESSION_UPDATE = '5000'
+USER_SERVICE = "<insert URL>"
+QUESTION_SERVICE = "<insert URL>"
+```
+
+### /ui-service/
+```
+
+```
+
 ## How to Deploy PeerPrep locally<a id='how-to-deploy-peerprep-locally'></a>
 
 
