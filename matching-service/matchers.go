@@ -1,4 +1,8 @@
 // matcher.go
+// AI Assistance Disclosure:
+// Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-05
+// Scope: Implemented `findFirstCommonLang()`.
+// Author review: Validated correctness.
 
 package main
 

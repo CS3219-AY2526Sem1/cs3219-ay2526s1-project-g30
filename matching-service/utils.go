@@ -1,4 +1,8 @@
 // utils.go
+// AI Assistance Disclosure:
+// Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-23
+// Scope: Generated comments
+// Author review: Checked.
 
 package main
 
@@ -14,7 +18,6 @@ func createMatchKey(difficulty, topic string) string {
 	d = strings.TrimSpace(d)
 	t = strings.TrimSpace(t)
 
-	// This is the key part for your insight:
 	// Split the topic by any amount of whitespace
 	topicFields := strings.Fields(t)
 
