@@ -172,12 +172,13 @@ export async function fetchRandomQuestion(
   const timeoutId = setTimeout(() => controller.abort(), config.questionService.timeout);
 
   try {
-    const url = `${config.questionService.baseUrl}${endpoint}`;
+   const url = `${config.questionService.baseUrl}${endpoint}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
+      cache: 'no-store',
       signal: controller.signal,
     });
 
