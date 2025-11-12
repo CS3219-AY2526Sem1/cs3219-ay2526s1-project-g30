@@ -1,13 +1,14 @@
 // matcher.go
 // AI Assistance Disclosure:
-// Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-05
-// Scope: Implemented `findFirstCommonLang()`.
+// Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-09, etc.
+// Scope: Implemented `findFirstCommonLang()` based on my architecture and pseudo-code
+// and explained `map` operations in Golang to me.
 // Author review: Validated correctness.
 
 package main
 
 type Matcher interface {
-	FindMatch(newUser *WaitingUser, pool map[string][]*WaitingUser) (*WaitingUser, string) // CHANGED: Return type
+	FindMatch(newUser *WaitingUser, pool map[string][]*WaitingUser) (*WaitingUser, string)
 }
 
 type AbsoluteMatcher struct{}
@@ -36,7 +37,7 @@ func (m *AbsoluteMatcher) FindMatch(newUser *WaitingUser, pool map[string][]*Wai
 
 	for _, opponent := range opponents {
 		if commonLang, found := findFirstCommonLang(newUser.Info.PreferredProgrammingLang, opponent.Info.PreferredProgrammingLang); found {
-			// Found a match!
+			// Found a match
 			return opponent, commonLang
 		}
 	}

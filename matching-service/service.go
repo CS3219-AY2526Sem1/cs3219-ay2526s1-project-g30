@@ -1,9 +1,10 @@
 // service.go
 // AI Assistance Disclosure:
 // Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-10, etc.
-// Scope: Implemented Mathcing Service (mainly `ProcessMatchRequest()`) prototype,
-// generated `CancelMatchRequest`, refactored other functions to a
-// more readable form and fixed URL encoding problem/waitingPool change.
+// Scope: Implemented Matching Service (mainly `ProcessMatchRequest()`) prototype,
+// Implemented `informCollaborationService` (almost same as `getQuestionFromService`)
+// fixed URL encoding problem/waitingPool change based on my ideas and designation.
+// refactored other functions to a more readable form
 // Author review: Validated correctness, done re-refactor and tested.
 
 package main
@@ -54,17 +55,15 @@ func getQuestionFromService(difficulty string, topic string, user1ID string, use
 		return "", err
 	}
 
-	// 3. Set the path for the specific endpoint
-	parsedURL.Path = "/questions/randomQuestion" // Or whatever the correct path is
+	parsedURL.Path = "/questions/randomQuestion"
 
-	// 4. Create a new set of query parameters
 	params := url.Values{}
 	params.Add("difficulty", difficulty)
-	params.Add("category", topic) // url.Values.Add() will automatically encode this!
+	params.Add("category", topic)
 	params.Add("user1", user1ID)
 	params.Add("user2", user2ID)
 
-	// 5. Encode the parameters and add them to the URL
+	// Encode the parameters and add them to the URL
 	parsedURL.RawQuery = params.Encode()
 
 	// 'finalURL' is now guaranteed to be correctly encoded
