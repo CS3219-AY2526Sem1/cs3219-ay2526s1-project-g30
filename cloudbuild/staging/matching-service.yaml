@@ -31,18 +31,25 @@ steps:
     args:
       - -c
       - |
-         COLLAB_URL=$(gcloud run services describe collab-service-staging --region=asia-southeast1 --format='value(status.url)')
-         QN_URL=$(gcloud run services describe question-service-staging --region=asia-southeast1 --format='value(status.url)')
-         echo "COLLAB_SERVICE_URL=$$COLLAB_URL" >> urls.env
-         echo "QUESTION_SERVICE_URL=$$QN_URL" >> urls.env
+        set -eu
+        COLLAB_URL=$(gcloud run services describe collab-service-staging --region=asia-southeast1 --format='value(status.url)')
+        QN_URL=$(gcloud run services describe question-service-staging --region=asia-southeast1 --format='value(status.url)')
+        echo "export COLLAB_SERVICE_URL=$$COLLAB_URL" >> /workspace/env_vars.sh
+        echo "export QUESTION_SERVICE_URL=$$QN_URL" >> /workspace/env_vars.sh
     waitFor: ['Build']
 
   - name: gcr.io/cloud-builders/docker
     id: Push
     args:
       - push
-      - --all-tags
-      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/matching-service
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/matching-service:$SHORT_SHA
+    waitFor: ['Build']
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push-latest
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/matching-service:pr-$_PR_NUMBER
     waitFor: ['Build']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -51,7 +58,8 @@ steps:
     args:
       - -c
       - |
-        source urls.env
+        set -eu
+        source /workspace/env_vars.sh
         gcloud run deploy matching-service-staging \
           --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/matching-service:$SHORT_SHA \
           --region=asia-southeast1 \
@@ -64,7 +72,7 @@ steps:
           --min-instances=0 \
           --max-instances=3 \
           --timeout=60
-    waitFor: ['Push','Resolve-URLs']
+    waitFor: ['Push','Push-latest','Resolve-URLs']
 
 substitutions:
   _PR_NUMBER: ''

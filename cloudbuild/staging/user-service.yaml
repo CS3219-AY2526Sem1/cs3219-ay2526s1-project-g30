@@ -29,8 +29,14 @@ steps:
     id: Push
     args:
       - push
-      - --all-tags
-      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:$SHORT_SHA
+    waitFor: ['Build']
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push-latest
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:pr-$_PR_NUMBER
     waitFor: ['Build']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -51,7 +57,7 @@ steps:
       - --min-instances=0
       - --max-instances=3
       - --timeout=60
-    waitFor: ['Push']
+    waitFor: ['Push', 'Push-latest']
 
 substitutions:
   _PR_NUMBER: ''

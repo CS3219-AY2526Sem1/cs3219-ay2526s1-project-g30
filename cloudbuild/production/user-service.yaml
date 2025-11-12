@@ -1,38 +1,25 @@
 # Production - user-service
+# Deploys the latest staging image to production
 
 steps:
-  - name: gcr.io/cloud-builders/gcloud
-    id: Retag
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        gcloud artifacts docker tags add \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:$SHORT_SHA \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/user-service:$SHORT_SHA && \
-        gcloud artifacts docker tags add \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:$SHORT_SHA \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/user-service:latest
-
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy
-    entrypoint: bash
+    entrypoint: gcloud
     args:
-      - -c
-      - |
-        gcloud run deploy user-service-production \
-          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/user-service:$SHORT_SHA \
-          --region=asia-southeast1 \
-          --platform=managed \
-          --allow-unauthenticated \
-          --port=5001 \
-          --set-secrets=MONGO_URI=MONGO_URI_USER_SERVICE:latest,JWT_SECRET=JWT_SECRET:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,GCS_BUCKET_NAME=GCS_BUCKET_NAME:latest \
-          --memory=512Mi \
-          --cpu=1 \
-          --min-instances=1 \
-          --max-instances=100 \
-          --timeout=60
-    waitFor: ['Retag']
+      - run
+      - deploy
+      - user-service-production
+      - --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:latest
+      - --region=asia-southeast1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=5001
+      - --set-secrets=MONGO_URI=MONGO_URI_USER_SERVICE:latest,JWT_SECRET=JWT_SECRET:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,GCS_BUCKET_NAME=GCS_BUCKET_NAME:latest
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=1
+      - --max-instances=100
+      - --timeout=60
 
 tags:
   - production
