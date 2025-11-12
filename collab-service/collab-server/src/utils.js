@@ -1,3 +1,7 @@
+// Code credits to dmonad on Github and the respective collaborators
+// Taken from https://github.com/yjs/y-websocket-server/tree/main
+// Made changes small changes to suit PeerPrep
+
 import * as Y from 'yjs'
 import * as syncProtocol from '@y/protocols/sync.js'
 import * as awarenessProtocol from '@y/protocols/awareness.js'

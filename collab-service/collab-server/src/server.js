@@ -1,10 +1,17 @@
 #!/usr/bin/env node
+
+// Code credits to dmonad on Github and the respective collaborators
+// Base code taken from https://github.com/yjs/y-websocket-server/tree/main
+// Made extensive changes to suit needs of PeerPrep
+
+// AI Assistance Disclosure:
+// Tool: Claude AI (Sonnet 4.5), date: 2025‑10-25
+// Scope: Debugging errors and issues with connecting with Cloud Run
+// Author review: Validated correctness
+
 import dotenv from 'dotenv'
 import WebSocket from 'ws'
 import http from 'http'
-import https from 'https'
-import fs from 'fs'
-import path from 'path'
 import os from 'os'
 import * as number from 'lib0/number.js'
 import { Session } from './session.js'
@@ -93,23 +100,7 @@ async function loadActiveSessions() {
 }
 
 // HTTP server setup
-// SSL/TLS options
-// const sslOptions = {
-//   key: process.env.KEY, //fs.readFileSync(path.join('key.pem')),
-//   cert: process.env.CERT, //fs.readFileSync(path.join('cert.pem')),
-//   // Recommended security settings
-//   secureOptions: constants.SSL_OP_NO_SSLv3 |
-//               constants.SSL_OP_NO_TLSv1 |
-//               constants.SSL_OP_NO_TLSv1_1
-// }
-
 const server = http.createServer(async (req, res) => {
-  // Security headers
-  // res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
-  // res.setHeader('X-Content-Type-Options', 'nosniff')
-  // res.setHeader('X-Frame-Options', 'SAMEORIGIN')
-  // res.setHeader('X-XSS-Protection', '1; mode=block')
-  // res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
 
   // Standard access to url
   if (req.url === '/') {
@@ -174,22 +165,6 @@ async function handleCreateSession(req, res) {
       if (!questionResult.signature || !templateResult?.template || !validUser1 || !validUser2 || user1 === user2) {
         throw new Error("Invalid parameters")
       }
-      // if (!questionResult.signature) {
-      //   throw new Error("Invalid parameters1")
-      // }
-      // if (!templateResult?.template) {
-      //   throw new Error("Invalid parameters2")
-      // }
-      // if (!validUser1) {
-      //   throw new Error("Invalid parameters3")
-      // }
-      // if (!validUser2) {
-      //   throw new Error("Invalid parameters4")
-      // }
-      // if (user1 === user2) {
-      //   throw new Error("Invalid parameters5")
-      // }
-
 
       const defaultContent = questionResult.definitions == '' ? templateResult.template.replace('<template function to go here>', questionResult.signature) : questionResult.definitions + '\n\n\n' + templateResult.template.replace('<template function to go here>', questionResult.signature)
       
