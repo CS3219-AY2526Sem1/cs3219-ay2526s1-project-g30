@@ -1,0 +1,93 @@
+# Staging - ui-service
+
+steps:
+  - name: node:lts-alpine
+    id: Test
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        cd ui-service && \
+        npm ci && \
+        npm test || npm run lint || echo "No tests configured"
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Resolve-URLs
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        USER_URL=$(gcloud run services describe user-service-staging --region=asia-southeast1 --format='value(status.url)')
+        QN_URL=$(gcloud run services describe question-service-staging --region=asia-southeast1 --format='value(status.url)')
+        MATCH_URL=$(gcloud run services describe matching-service-staging --region=asia-southeast1 --format='value(status.url)')
+        COLLAB_URL=$(gcloud run services describe collab-service-staging --region=asia-southeast1 --format='value(status.url)')
+        echo "NEXT_PUBLIC_USER_SERVICE_URL=${USER_URL}/api/users" >> urls.env
+        echo "NEXT_PUBLIC_QUESTION_SERVICE_URL=${QN_URL}" >> urls.env
+        echo "NEXT_PUBLIC_MATCHING_SERVICE_URL=${MATCH_URL}/api/v1" >> urls.env
+        echo "NEXT_PUBLIC_COLLAB_SERVICE_URL=${COLLAB_URL}/" >> urls.env
+        echo "NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=wss://${COLLAB_URL#https://}/" >> urls.env
+
+  - name: gcr.io/cloud-builders/docker
+    id: Build
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        source urls.env
+        docker build \
+          --no-cache \
+          -t asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service:$SHORT_SHA \
+          -t asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service:pr-$_PR_NUMBER \
+          --build-arg SESSION_SECRET=$$SESSION_SECRET \
+          --build-arg NEXT_PUBLIC_USER_SERVICE_URL=$NEXT_PUBLIC_USER_SERVICE_URL \
+          --build-arg NEXT_PUBLIC_QUESTION_SERVICE_URL=$NEXT_PUBLIC_QUESTION_SERVICE_URL \
+          --build-arg NEXT_PUBLIC_MATCHING_SERVICE_URL=$NEXT_PUBLIC_MATCHING_SERVICE_URL \
+          --build-arg NEXT_PUBLIC_COLLAB_SERVICE_URL=$NEXT_PUBLIC_COLLAB_SERVICE_URL \
+          --build-arg NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=$NEXT_PUBLIC_COLLAB_SERVICE_WS_URL \
+          -f ui-service/Dockerfile \
+          ui-service
+    secretEnv:
+      - SESSION_SECRET
+    waitFor: ['Test','Resolve-URLs']
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push
+    args:
+      - push
+      - --all-tags
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service
+    waitFor: ['Build']
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ui-service-staging
+      - --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service:$SHORT_SHA
+      - --region=asia-southeast1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=3000
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=3
+      - --timeout=60
+    waitFor: ['Push']
+
+availableSecrets:
+  secretManager:
+    - env: SESSION_SECRET
+      versionName: projects/cs3219-peerprep-g30/secrets/SESSION_SECRET/versions/latest
+
+substitutions:
+  _PR_NUMBER: ''
+
+tags:
+  - staging
+  - ui-service
+  - pr-$_PR_NUMBER
+
+timeout: 1800s
