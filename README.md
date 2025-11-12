@@ -7,25 +7,25 @@
 - The teaching team should be given access to the repositories as we may require viewing the history of the repository in case of any disputes or disagreements. 
 
 ## Table of Contents
-1. [Product Overview](##product-overview)
-2. [Project Architecture](##project-architecture)
-3. [Pre-requisites](##pre-requisites)
-4. [How to Deploy PeerPrep locally](##how-to-deploy-peerprep-locally)
-4. [AI Usage Documentation](##ai-usage-documentation)
+1. [Product Overview](#product-overview)
+2. [Project Architecture](#project-architecture)
+3. [Pre-requisites](#pre-requisites)
+4. [How to Deploy PeerPrep locally](#how-to-deploy-peerprep-locally)
+4. [AI Usage Documentation](#ai-usage-documentation)
 
-## Product Overview
+## Product Overview<a id='product-overview'></a>
 PeerPrep is an online learning platform designed to help new coders grow through collaboration and peer learning. It provides an interactive environment where users can connect with others of similar skill levels and practice solving common coding interview questions together in real time. PeerPrep promotes learning helping beginners strengthen their coding skills, build confidence, and prepare more effectively for technical interviews.
 
-## Project Architecture
+## Project Architecture<a id='project-architecture'></a>
 
 
-## Pre-requisites
-
-
-
-## How to Deploy PeerPrep locally
+## Pre-requisites<a id='pre-requisites'></a>
 
 
 
-## AI Usage Documentation
+## How to Deploy PeerPrep locally<a id='how-to-deploy-peerprep-locally'></a>
+
+
+
+## AI Usage Documentation<a id='ai-usage-documentation'></a>
 Refer to  [`ai/usage-log.md`](./ai/usage-log.md) for a record of how AI was used in the development of PeerPrep.
