@@ -1,22 +1,20 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { Navbar } from '@/components/Navbar'
-import type { User } from '@/types/auth'
+
 
 interface LayoutContentClientProps {
   children: React.ReactNode
-  userProfile: User | null
 }
 
-export function LayoutContentClient({ children, userProfile }: LayoutContentClientProps) {
+export function LayoutContentClient({ children }: LayoutContentClientProps) {
   const pathname = usePathname()
   const isLoginPage = pathname.startsWith('/login')
   const isRootPage = pathname === '/'
 
   return (
     <>
-      {!isLoginPage && !isRootPage && <Navbar userProfile={userProfile} />}
+      {/* Navbar is rendered by NavbarUserLayout; only hide it on login/root */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {children}
       </div>

@@ -69,14 +69,15 @@ export function useMatchingFlow(): MatchingFlowResult {
         id: toastIdRef.current ?? undefined,
         duration: Infinity,
         position: 'top-center',
-         actionButtonStyle: {
-           backgroundColor: 'var(--destructive)',
-           color: 'white',
-         },
-         action: {
-           label: 'Cancel',
-           icon: 'x',
-          onClick: async () => {
+           // Styled cancel button for cancelling the match request
+           actionButtonStyle: {
+             backgroundColor: 'var(--destructive)',
+             color: 'white',
+           },
+           action: {
+            label: 'Cancel',
+            // Using label only; icon not supported in sonner's Action type
+            onClick: async () => {
             userCancelledRef.current = true
             if (toastIdRef.current) {
               toast.dismiss(toastIdRef.current)

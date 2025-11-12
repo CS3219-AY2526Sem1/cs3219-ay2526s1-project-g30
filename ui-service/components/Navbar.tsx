@@ -18,6 +18,10 @@ interface NavbarProps {
   userProfile: User | null
 }
 
+interface NavbarWithoutPropsProps {
+  userProfile?: User | null
+}
+
 function NavbarSkeleton() {
   return (
     <nav className="sticky top-0 z-50 border-b border-gray-800 bg-black">
