@@ -5,6 +5,12 @@ import {generateFunctionTemplate} from "../utils/generateSignature.js";
 
 const router = express.Router();
 
+// helper function to create a case-insensitive regex filter
+function caseInsensitiveFilter(value) {
+    const escapedValue = RegExp.escape(value);
+    return { $regex: `^${escapedValue}$`, $options: 'i' };
+}
+
 // get a random question by difficulty and category, avoid duplicates for user completed qns
 router.get('/randomQuestion', async (req, res) => {
     try {
@@ -31,8 +37,8 @@ router.get('/randomQuestion', async (req, res) => {
 
         // build base filter (difficulty/category)
         const baseFilter = {};
-        if (difficulty) baseFilter.difficulty = difficulty;
-        if (category) baseFilter.category = category;
+        if (difficulty) baseFilter.difficulty = caseInsensitiveFilter(difficulty);
+        if (category) baseFilter.category = caseInsensitiveFilter(category);
 
         // progressive selection
         let question = null;
@@ -165,6 +171,35 @@ router.post('/', async (req, res) => {
         res.status(201).json(savedQuestion);
     } catch (error) {
         res.status(500).json({message: error.message});
+    }
+});
+
+// batch insert multiple questions
+router.post('/batch', async (req, res) => {
+    try {
+        const questions = req.body;
+
+        if (!Array.isArray(questions) || questions.length === 0) {
+            return res.status(400).json({ message: "Request body must be a non-empty array of questions" });
+        }
+
+        // Normalize category field: ensure every question uses an array
+        const normalizedQuestions = questions.map(q => ({
+            ...q,
+            category: Array.isArray(q.category) ? q.category : [q.category]
+        }));
+
+        // Insert all questions at once
+        const insertedQuestions = await Question.insertMany(normalizedQuestions, { ordered: false });
+
+        res.status(201).json({
+            message: `${insertedQuestions.length} questions inserted successfully`,
+            insertedIds: insertedQuestions.map(q => q._id)
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: error.message });
     }
 });
 

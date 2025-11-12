@@ -1,0 +1,78 @@
+# Dev - collab-service (WebSocket)
+
+steps:
+  - name: node:lts-alpine
+    id: Test
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        cd collab-service/collab-server && \
+        npm ci && \
+        npm run lint 2>/dev/null || echo "No tests configured"
+
+  - name: gcr.io/cloud-builders/docker
+    id: Build
+    args:
+      - build
+      - --no-cache
+      - -t
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/collab-service:$SHORT_SHA
+      - -t
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/collab-service:latest
+      - -f
+      - collab-service/collab-server/Dockerfile
+      - collab-service/collab-server
+    waitFor: ['Test']
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Resolve-URLs
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        USER_URL=$(gcloud run services describe user-service-dev --region=asia-southeast1 --format='value(status.url)')
+        QN_URL=$(gcloud run services describe question-service-dev --region=asia-southeast1 --format='value(status.url)')
+        echo "USER_SERVICE=${USER_URL}/" >> urls.env
+        echo "QUESTION_SERVICE=${QN_URL}" >> urls.env
+    waitFor: ['Build']
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push
+    args:
+      - push
+      - --all-tags
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/collab-service
+    waitFor: ['Build']
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        source urls.env
+        gcloud run deploy collab-service-dev \
+          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/collab-service:$SHORT_SHA \
+          --region=asia-southeast1 \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=1234 \
+          --set-secrets=MONGO_DB_URL=MONGO_URI_COLLAB_SERVICE:latest \
+          --set-env-vars=QUESTION_SERVICE=$QUESTION_SERVICE,USER_SERVICE=$USER_SERVICE,SESSION_TIMEOUT=3600000,SESSION_UPDATE=60000 \
+          --memory=1Gi \
+          --cpu=2 \
+          --min-instances=0 \
+          --max-instances=3 \
+          --timeout=3600 \
+          --session-affinity
+    waitFor: ['Push','Resolve-URLs']
+
+images:
+  - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/collab-service:$SHORT_SHA
+
+tags:
+  - dev
+  - collab-service
+
+timeout: 1200s

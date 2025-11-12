@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-10-28
+// Scope: Generated implementation based on my API requirements.
+// Author review: Validated correctness.
+
 const User = require('../../models/User');
 
 const verifyOtp = async (req, res) => {
@@ -6,8 +11,6 @@ const verifyOtp = async (req, res) => {
   if (!userId || !otp) {
     return res.status(400).json({ message: 'User ID and OTP are required.' });
   }
-  // Optional: Add mongoose ID validation if desired
-  // if (!mongoose.Types.ObjectId.isValid(userId)) { ... }
 
   try {
     const user = await User.findById(userId);

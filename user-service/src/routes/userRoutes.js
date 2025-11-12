@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-10-09
+// Scope: Check for correctness of Express.js route definitions and middleware usage.
+// Author review: Validated correctness.
+
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
@@ -16,16 +21,16 @@ const {
   verifyOtp,
   addCompletedQuestion,
   resendVerificationOtp,
-  checkUsername
+  checkUsername,
+  checkUserId
 } = require('../controllers/userController');
 
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image')) {
-    cb(null, true); // Accept the file
+    cb(null, true); 
   } else {
-    // Reject the file and provide an error message
     cb(new Error('Invalid file type. Only images are allowed.'), false);
   }
 };
@@ -42,6 +47,7 @@ router.post('/verify-otp', verifyOtp);
 router.post('/resend-verification-otp', resendVerificationOtp);
 router.post('/profile/add-completed-question', addCompletedQuestion);
 router.post('/check-username', checkUsername);
+router.get('/check-id/:id', checkUserId);
 
 // Private Routes (Protected by middleware)
 router.put('/profile', protect, updateUserProfile);

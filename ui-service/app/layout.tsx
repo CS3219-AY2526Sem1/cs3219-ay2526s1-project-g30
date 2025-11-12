@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { LayoutContent } from "./LayoutContent";
+
+import { AppShell } from "./AppShell";
 import { validateConfigAtRuntime } from "@/lib/config";
 
 // Validate environment variables at runtime (not build time)
@@ -32,7 +34,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LayoutContent>{children}</LayoutContent>
+        <AppShell>
+          <LayoutContent>{children}</LayoutContent>
+        </AppShell>
       </body>
     </html>
   );

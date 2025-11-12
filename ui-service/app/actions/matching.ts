@@ -30,6 +30,17 @@ import { requireAuth } from '@/lib/dal';
 import { config } from '@/lib/config';
 import { requestMatch, MatchingServiceError } from '@/lib/matchingServiceClient';
 import type { FormState } from '@/types/auth';
+import type { Question } from '@/lib/questionServiceClient';
+import {
+  logServerActionStart,
+  logServerActionSuccess,
+  logServerActionError,
+  logOutgoingRequest,
+  logIncomingResponse,
+  logServiceError,
+  logValidationError,
+  logTiming,
+} from '@/lib/logger';
 
 export interface MatchingFormState extends FormState {
   success?: boolean;
@@ -91,9 +102,18 @@ export async function startMatching(
   previousState: MatchingFormState | undefined,
   formData: FormData
 ): Promise<MatchingFormState> {
+  logServerActionStart('startMatching');
+  const startTime = Date.now();
+
   try {
     // Verify user is authenticated
     const session = await requireAuth();
+
+    logOutgoingRequest('auth', '', 'GET', {
+      userId: session.userId,
+      action: 'fetch session',
+      timestamp: new Date().toISOString(),
+    });
 
     // Extract form data
     const difficulty = formData.get('difficulty');
@@ -102,6 +122,7 @@ export async function startMatching(
 
     // Validate required fields
     if (!difficulty || typeof difficulty !== 'string') {
+      logValidationError('startMatching', { difficulty: ['Difficulty level is required'] });
       return {
         success: false,
         error: 'Difficulty level is required',
@@ -109,6 +130,7 @@ export async function startMatching(
     }
 
     if (!topic || typeof topic !== 'string') {
+      logValidationError('startMatching', { topic: ['Topic is required'] });
       return {
         success: false,
         error: 'Topic is required',
@@ -116,6 +138,7 @@ export async function startMatching(
     }
 
     if (!languagesStr || typeof languagesStr !== 'string') {
+      logValidationError('startMatching', { languages: ['At least one programming language must be selected'] });
       return {
         success: false,
         error: 'At least one programming language must be selected',
@@ -125,6 +148,7 @@ export async function startMatching(
     const languages = languagesStr.split(',').filter((lang) => lang.trim().length > 0);
 
     if (languages.length === 0) {
+      logValidationError('startMatching', { languages: ['At least one programming language must be selected'] });
       return {
         success: false,
         error: 'At least one programming language must be selected',
@@ -133,18 +157,18 @@ export async function startMatching(
 
     // WORKAROUND: Normalize difficulty and topic to lowercase to work around matching service bug
     // The matching service has a bug where timeout cleanup uses raw concatenation (Difficulty + "-" + Topic)
-    // instead of the normalized createMatchKey function (which lowercases both).
-    // By sending lowercase values, both the normalized key and raw concatenation will match.
+    // instead of the normalised createMatchKey function (which lowercases both).
+    // By sending lowercase values, both the normalised key and raw concatenation will match.
     const normalizedDifficulty = difficulty.toLowerCase();
     const normalizedTopic = topic.toLowerCase().trim().replace(/\s+/g, '-');
 
     // Log the matching request for debugging
-    console.log('[Matching Action] Starting match with request:', {
+    logOutgoingRequest('matchingService', '/match', 'POST', {
       userId: session.userId,
       username: session.username,
       difficulty: normalizedDifficulty,
       topic: normalizedTopic,
-      preferredProgrammingLang: languages,
+      preferredProgrammingLanguages: languages,
       expectedMatchKey: `${normalizedDifficulty}-${normalizedTopic}`,
       timestamp: new Date().toISOString(),
     });
@@ -155,6 +179,27 @@ export async function startMatching(
       difficulty: normalizedDifficulty,
       topic: normalizedTopic,
       preferredProgrammingLang: languages,
+    });
+
+    const durationMilliseconds = Date.now() - startTime;
+
+    logIncomingResponse('matchingService', '/match', 200, {
+      sessionId: matchResult.sessionId,
+      questionId: matchResult.questionId,
+      programmingLanguage: matchResult.programmingLang,
+      userId: session.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    logTiming('matching request', durationMilliseconds, {
+      userId: session.userId,
+      difficulty: normalizedDifficulty,
+    });
+
+    logServerActionSuccess('startMatching', {
+      userId: session.userId,
+      sessionId: matchResult.sessionId,
+      questionId: matchResult.questionId,
     });
 
     // Return success with match data so the client can show feedback
@@ -175,7 +220,12 @@ export async function startMatching(
 
     if (error instanceof MatchingServiceError) {
       // Handle specific matching service errors
+      logServiceError('matchingService', '/match', error, {
+        statusCode: error.statusCode,
+      });
+
       if (error.statusCode === 408) {
+        logServerActionError('startMatching', 'Match request timed out');
         return {
           success: false,
           error: 'No matching interview partner found. Please try again.',
@@ -190,17 +240,20 @@ export async function startMatching(
     if (error instanceof Error) {
       // Handle other errors (e.g., auth errors)
       if (error.message.includes('Unauthorized')) {
+        logServerActionError('startMatching', 'User not authenticated');
         return {
           success: false,
           error: 'You must be logged in to start matching',
         };
       }
+      logServiceError('matchingService', '/match', error);
       return {
         success: false,
         error: error.message,
       };
     }
 
+    logServerActionError('startMatching', error);
     return {
       success: false,
       error: 'An unexpected error occurred while trying to find a match',
@@ -221,14 +274,26 @@ export async function terminateCollaborativeSession(
   sessionId: string,
   userId: string
 ): Promise<{ success: boolean; error?: string }> {
+  logServerActionStart('terminateCollaborativeSession', {
+    sessionId,
+    userId,
+  });
+  const startTime = Date.now();
+
   try {
     // Verify user is authenticated
     await requireAuth();
 
+    logOutgoingRequest('auth', '', 'GET', {
+      userId,
+      action: 'fetch session',
+      timestamp: new Date().toISOString(),
+    });
+
     const { collaborationService } = config;
     const url = `${collaborationService.baseUrl}/api/terminate`;
 
-    console.log('[Matching] Terminating session server-side:', {
+    logOutgoingRequest('matchingService', '/api/terminate', 'POST', {
       sessionId,
       userId,
       url,
@@ -252,18 +317,27 @@ export async function terminateCollaborativeSession(
 
     clearTimeout(timeoutId);
 
-    console.log('[Matching] Session termination response:', {
-      status: response.status,
-      statusText: response.statusText,
+    const durationMilliseconds = Date.now() - startTime;
+
+    logIncomingResponse('matchingService', '/api/terminate', response.status, {
       sessionId,
+      userId,
+      statusText: response.statusText,
+      timestamp: new Date().toISOString(),
+    });
+
+    logTiming('session termination request', durationMilliseconds, {
+      sessionId,
+      userId,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Matching] Failed to terminate session:', {
-        status: response.status,
-        error: errorText,
+      logServiceError('matchingService', '/api/terminate', new Error(errorText), {
+        statusCode: response.status,
         sessionId,
+        userId,
+        errorText,
       });
 
       return {
@@ -272,7 +346,7 @@ export async function terminateCollaborativeSession(
       };
     }
 
-    console.log('[Matching] Session terminated successfully:', {
+    logServerActionSuccess('terminateCollaborativeSession', {
       sessionId,
       userId,
       timestamp: new Date().toISOString(),
@@ -281,8 +355,9 @@ export async function terminateCollaborativeSession(
     return { success: true };
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.error('[Matching] Session termination timed out:', {
-        sessionId: userId,
+      logServerActionError('terminateCollaborativeSession', 'Request timed out', {
+        sessionId,
+        userId,
       });
 
       return {
@@ -292,11 +367,188 @@ export async function terminateCollaborativeSession(
     }
 
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('[Matching] Error terminating session:', {
-      error: errorMessage,
-      sessionId: userId,
+    logServiceError('matchingService', '/api/terminate', error, {
+      sessionId,
+      userId,
     });
 
+    logServerActionError('terminateCollaborativeSession', error, {
+      sessionId,
+      userId,
+    });
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Cancels an active matching request for the current user.
+ *
+ * This Server Action:
+ * 1. Verifies the user is authenticated
+ * 2. Calls the matching service to cancel their active match request
+ * 3. Returns success or error status
+ *
+ * Can be called in two ways:
+ * - From useActionState: await cancelMatching(previousState)
+ * - From startTransition: startTransition(() => cancelMatching())
+ *
+ * @param previousState The previous form state (optional, unused but required by useActionState)
+ * @returns Object with success status and optional error message
+ */
+export async function cancelMatching(
+  previousState?: MatchingFormState | undefined
+): Promise<MatchingFormState> {
+  logServerActionStart('cancelMatching');
+  const startTime = Date.now();
+
+  try {
+    // Verify user is authenticated
+    const session = await requireAuth();
+
+    logOutgoingRequest('auth', '', 'GET', {
+      userId: session.userId,
+      action: 'fetch session',
+      timestamp: new Date().toISOString(),
+    });
+
+    // Import dynamically to avoid circular dependency issues
+    const { cancelMatchRequest } = await import('@/lib/matchingServiceClient');
+
+    logOutgoingRequest('matchingService', '/cancel', 'POST', {
+      userId: session.userId,
+      username: session.username,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Call matching service to cancel the request
+    const cancelResult = await cancelMatchRequest(session.userId);
+
+    const durationMilliseconds = Date.now() - startTime;
+
+    logIncomingResponse('matchingService', '/cancel', 200, {
+      status: cancelResult.status,
+      userId: session.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    logTiming('matching cancellation request', durationMilliseconds, {
+      userId: session.userId,
+    });
+
+    logServerActionSuccess('cancelMatching', {
+      userId: session.userId,
+      status: cancelResult.status,
+    });
+
+    return {
+      success: true,
+      error: undefined,
+    };
+  } catch (error) {
+    // Re-throw redirect errors to allow Next.js to handle the redirect
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
+    if (error instanceof MatchingServiceError) {
+      logServiceError('matchingService', '/cancel', error, {
+        statusCode: error.statusCode,
+      });
+
+      if (error.statusCode === 404) {
+        // User not found in matching pool - this is acceptable
+        logServerActionSuccess('cancelMatching', {
+          message: 'No active matching request found',
+        });
+        return {
+          success: true,
+          error: undefined,
+        };
+      }
+
+      return {
+        success: false,
+        error: `Matching service error: ${error.message}`,
+      };
+    }
+
+    if (error instanceof Error) {
+      if (error.message.includes('Unauthorized')) {
+        logServerActionError('cancelMatching', 'User not authenticated');
+        return {
+          success: false,
+          error: 'You must be logged in to cancel matching',
+        };
+      }
+      logServiceError('matchingService', '/cancel', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+
+    logServerActionError('cancelMatching', error);
+    return {
+      success: false,
+      error: 'An unexpected error occurred while trying to cancel matching',
+    };
+  }
+}
+
+/**
+ * Server Action to fetch a question by ID.
+ * 
+ * This wraps the question service client in a Server Action so that
+ * the client component can safely fetch questions without directly importing
+ * the server-only questionServiceClient module.
+ */
+export async function fetchQuestionAction(questionId: string): Promise<{ success: boolean; data?: Question; error?: string }> {
+  try {
+    const { fetchQuestion } = await import('@/lib/questionServiceClient');
+    const question = await fetchQuestion(questionId);
+    return {
+      success: true,
+      data: question,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch question';
+    logServiceError('questionService', `/api/questions/${questionId}`, error);
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Server Action to fetch question statistics (available categories and difficulties).
+ *
+ * This wraps the question service client in a Server Action so that
+ * the client component can safely fetch stats without directly importing
+ * the server-only questionServiceClient module.
+ */
+export async function fetchQuestionStatsAction(): Promise<{
+  success: boolean;
+  stats?: {
+    categories: string[];
+    difficultyCounts: Record<string, Record<'easy' | 'medium' | 'hard', number>>;
+  };
+  error?: string;
+}> {
+  try {
+    const { fetchQuestionStatsCached } = await import('@/lib/questionServiceClient');
+    const stats = await fetchQuestionStatsCached();
+    return {
+      success: true,
+      stats,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch question stats';
+    logServiceError('questionService', '/stats', error);
     return {
       success: false,
       error: errorMessage,
