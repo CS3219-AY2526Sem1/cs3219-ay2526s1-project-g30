@@ -71,7 +71,16 @@ QUESTION_SERVICE = "<insert URL>"
 
 ### /ui-service/
 ```
-
+NODE_ENV=development
+SESSION_SECRET=<secret key here>
+JWT_SECRET=<secret key here>
+SESSION_EXPIRES_IN_DAYS=7
+NEXT_PUBLIC_USER_SERVICE_URL=<url here>
+NEXT_PUBLIC_MATCHING_SERVICE_URL=<url here>
+NEXT_PUBLIC_QUESTION_SERVICE_URL=<url here>
+NEXT_PUBLIC_COLLAB_SERVICE_URL=<url here>
+NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=<websocket url here>
+USER_SERVICE_TIMEOUT=10000
 ```
 
 ## How to Deploy PeerPrep locally<a id='how-to-deploy-peerprep-locally'></a>
