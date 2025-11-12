@@ -68,5 +68,5 @@ $RECYCLE.BIN/
 **/node_modules/
 **/.*env
 .vscode/
-**/test/
-env.yaml
+.DS_Store
+collab-service/app
