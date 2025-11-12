@@ -40,11 +40,24 @@ PeerPrep is an online learning platform designed to help new coders grow through
 ## .env Setup
 Each microservice uses its own configured environment variables. To run the services locally, you will need to create the following .env files and supply the your own values.
 
-If running locally, use `http://localhost:<insert PORT>` for each microservice.
+Note that the user, question and collab services each use their own MongoDB database. We do not provide locally hosted MongoDB databases in this repo.
+
+If running locally, use `http://localhost:<insert PORT>` for each microservice. The default port for each microservice is as follows:
+| Service | Port |
+|---------|------|
+| User | 5001 |
+| Matching | 8080 |
+| Question | 4000 |
+| Collab | 1234 |
+| UI | 3000 |
 
 ### /user-service/.env
 ```
-
+MONGO_URI=<insert database URL>
+PORT=5001
+JWT_SECRET=your_super_secret_random_string_that_is_long_and_unguessable
+SENDGRID_API_KEY=<insert SendGrid API key>
+GCS_BUCKET_NAME=peerprep-user-service
 ```
 
 ### /matching-service/.env
@@ -52,21 +65,20 @@ If running locally, use `http://localhost:<insert PORT>` for each microservice.
 COLLAB_SERVICE_URL: "<insert URL>"
 QUESTION_SERVICE_URL: "<insert URL>"
 ```
-Default port for collab service is `1234`.
 
 ### /question-service/.env
 ```
-MONGO_URI="<insert URL>"
-USER_SERVICE_URL="<insert URL>"
+MONGO_URI=<insert database URL>
+USER_SERVICE_URL=<insert URL>
 ```
 
 ### /collab-service/collab-server/.env
 ```
-MONGO_DB_URL = "<insert URL>"
+MONGO_DB_URL = <insert URL>
 SESSION_TIMEOUT = '3600000'
 SESSION_UPDATE = '5000'
-USER_SERVICE = "<insert URL>"
-QUESTION_SERVICE = "<insert URL>"
+USER_SERVICE = <insert URL>
+QUESTION_SERVICE = <insert URL>
 ```
 
 ### /ui-service/
@@ -82,9 +94,48 @@ NEXT_PUBLIC_COLLAB_SERVICE_URL=<url here>
 NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=<websocket url here>
 USER_SERVICE_TIMEOUT=10000
 ```
+If running locally, `NEXT_PUBLIC_COLLAB_SERVICE_WS_URL` should be `ws://localhost:1234`.
 
 ## How to Deploy PeerPrep locally<a id='how-to-deploy-peerprep-locally'></a>
 
+You will have to run **each microservice in a separate terminal**. Ensure that Docker is running, then from the project root folder, navigate to each service's Dockerfile, build the image and run it.
+
+The instructions below assume you always begin from the project root folder.
+
+### User Service
+```
+cd user-service
+docker build -t user-service .
+docker run --env-file .env user-service
+```
+
+### Matching Service
+```
+cd matching-service
+docker build -t matching-service .
+docker run --env-file .env matching-service
+```
+
+### Question Service
+```
+cd question-service
+docker build -t question-service .
+docker run --env-file .env question-service
+```
+
+### Collab Service
+```
+cd collab-service/collab-server
+docker build -t collab-service .
+docker run --env-file .env collab-service
+```
+
+### UI Service
+```
+cd ui-service
+docker build -t ui-service .
+docker run --env-file .env ui-service
+```
 
 
 ## AI Usage Documentation<a id='ai-usage-documentation'></a>
