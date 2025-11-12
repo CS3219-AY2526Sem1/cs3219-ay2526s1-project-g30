@@ -29,10 +29,16 @@ steps:
     id: Push
     args:
       - push
-      - --all-tags
-      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/question-service
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/question-service:$SHORT_SHA
     waitFor: ['Build']
- 
+   
+  - name: gcr.io/cloud-builders/docker
+    id: Push-latest
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/question-service:pr-$_PR_NUMBER
+    waitFor: ['Build']
+
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Resolve-URLs
     entrypoint: bash
@@ -46,7 +52,7 @@ steps:
           --format='value(status.url)')
         echo "export USER_SERVICE_URL=$$USER_URL/api/users" >> /workspace/env_vars.sh
     waitFor: ['Build']
- 
+  
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy
     entrypoint: bash
@@ -68,7 +74,7 @@ steps:
           --min-instances=0 \
           --max-instances=3 \
           --timeout=60
-    waitFor: ['Resolve-URLs','Push']
+    waitFor: ['Resolve-URLs','Push','Push-latest']
 
 substitutions:
   _PR_NUMBER: ''

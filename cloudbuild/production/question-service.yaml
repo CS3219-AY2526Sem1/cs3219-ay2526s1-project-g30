@@ -1,19 +1,6 @@
 # Production - question-service
 
 steps:
-  - name: gcr.io/cloud-builders/gcloud
-    id: Retag
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        gcloud artifacts docker tags add \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/question-service:$SHORT_SHA \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/question-service:$SHORT_SHA && \
-        gcloud artifacts docker tags add \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/question-service:$SHORT_SHA \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/question-service:latest
-
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Resolve-URLs
     entrypoint: bash
@@ -22,7 +9,6 @@ steps:
       - |
          USER_URL=$(gcloud run services describe user-service-production --region=asia-southeast1 --format='value(status.url)')
          echo "USER_SERVICE_URL=$$USER_URL/api/users" >> urls.env
-    waitFor: ['Retag']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy
@@ -32,13 +18,13 @@ steps:
       - |
         source urls.env
         gcloud run deploy question-service-production \
-          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/question-service:$SHORT_SHA \
+          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/question-service:latest \
           --region=asia-southeast1 \
           --platform=managed \
           --allow-unauthenticated \
           --port=4000 \
           --set-secrets=MONGO_URI=MONGO_URI_QUESTION_SERVICE:latest \
-          --set-env-vars=USER_SERVICE_URL=$$USER_SERVICE_URL \\
+          --set-env-vars=USER_SERVICE_URL=$$USER_SERVICE_URL \
           --memory=512Mi \
           --cpu=1 \
           --min-instances=1 \
@@ -51,3 +37,4 @@ tags:
   - question-service
 
 timeout: 900s
+

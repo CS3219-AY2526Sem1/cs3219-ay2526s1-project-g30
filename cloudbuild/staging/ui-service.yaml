@@ -7,9 +7,9 @@ steps:
     args:
       - -c
       - |
-        cd ui-service && \
-        npm ci && \
-        npm test || npm run lint || echo "No tests configured"
+         cd ui-service && \
+         npm ci && \
+         npm test || npm run lint || echo "No tests configured"
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Resolve-URLs
@@ -17,15 +17,17 @@ steps:
     args:
       - -c
       - |
-         USER_URL=$(gcloud run services describe user-service-staging --region=asia-southeast1 --format='value(status.url)')
-         QN_URL=$(gcloud run services describe question-service-staging --region=asia-southeast1 --format='value(status.url)')
-         MATCH_URL=$(gcloud run services describe matching-service-staging --region=asia-southeast1 --format='value(status.url)')
-         COLLAB_URL=$(gcloud run services describe collab-service-staging --region=asia-southeast1 --format='value(status.url)')
-         echo "NEXT_PUBLIC_USER_SERVICE_URL=$$USER_URL/api/users" >> urls.env
-         echo "NEXT_PUBLIC_QUESTION_SERVICE_URL=$$QN_URL" >> urls.env
-         echo "NEXT_PUBLIC_MATCHING_SERVICE_URL=$$MATCH_URL/api/v1" >> urls.env
-         echo "NEXT_PUBLIC_COLLAB_SERVICE_URL=$$COLLAB_URL/" >> urls.env
-         echo "NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=wss://$${COLLAB_URL#https://}/" >> urls.env
+        set -eu
+        USER_URL=$(gcloud run services describe user-service-staging --region=asia-southeast1 --format='value(status.url)')
+        QN_URL=$(gcloud run services describe question-service-staging --region=asia-southeast1 --format='value(status.url)')
+        MATCH_URL=$(gcloud run services describe matching-service-staging --region=asia-southeast1 --format='value(status.url)')
+        COLLAB_URL=$(gcloud run services describe collab-service-staging --region=asia-southeast1 --format='value(status.url)')
+        echo "export NEXT_PUBLIC_USER_SERVICE_URL=$$USER_URL/api/users" >> /workspace/env_vars.sh
+        echo "export NEXT_PUBLIC_QUESTION_SERVICE_URL=$$QN_URL" >> /workspace/env_vars.sh
+        echo "export NEXT_PUBLIC_MATCHING_SERVICE_URL=$$MATCH_URL/api/v1" >> /workspace/env_vars.sh
+        echo "export NEXT_PUBLIC_COLLAB_SERVICE_URL=$$COLLAB_URL/" >> /workspace/env_vars.sh
+        echo "export NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=wss://$${COLLAB_URL#https://}/" >> /workspace/env_vars.sh
+    waitFor: ['Test']
 
   - name: gcr.io/cloud-builders/docker
     id: Build
@@ -33,7 +35,8 @@ steps:
     args:
       - -c
       - |
-        source urls.env
+        set -eu
+        source /workspace/env_vars.sh
         docker build \
           --no-cache \
           -t asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service:$SHORT_SHA \
@@ -48,14 +51,20 @@ steps:
           ui-service
     secretEnv:
       - SESSION_SECRET
-    waitFor: ['Test','Resolve-URLs']
+    waitFor: ['Resolve-URLs']
 
   - name: gcr.io/cloud-builders/docker
     id: Push
     args:
       - push
-      - --all-tags
-      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service:$SHORT_SHA
+    waitFor: ['Build']
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push-latest
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service:pr-$_PR_NUMBER
     waitFor: ['Build']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -65,7 +74,7 @@ steps:
       - -c
       - |
         set -eu
-        source urls.env
+        source /workspace/env_vars.sh
         gcloud run deploy ui-service-staging \
           --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service:$SHORT_SHA \
           --region=asia-southeast1 \
@@ -79,7 +88,7 @@ steps:
           --timeout=720 \
           --set-secrets=SESSION_SECRET=SESSION_SECRET:latest \
           --set-env-vars=NEXT_PUBLIC_USER_SERVICE_URL=$$NEXT_PUBLIC_USER_SERVICE_URL,NEXT_PUBLIC_QUESTION_SERVICE_URL=$$NEXT_PUBLIC_QUESTION_SERVICE_URL,NEXT_PUBLIC_MATCHING_SERVICE_URL=$$NEXT_PUBLIC_MATCHING_SERVICE_URL,NEXT_PUBLIC_COLLAB_SERVICE_URL=$$NEXT_PUBLIC_COLLAB_SERVICE_URL,NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=$$NEXT_PUBLIC_COLLAB_SERVICE_WS_URL
-    waitFor: ['Push']
+    waitFor: ['Push','Push-latest']
 
 availableSecrets:
   secretManager:

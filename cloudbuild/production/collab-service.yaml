@@ -1,19 +1,6 @@
 # Production - collab-service
 
 steps:
-  - name: gcr.io/cloud-builders/gcloud
-    id: Retag
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        gcloud artifacts docker tags add \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/collab-service:$SHORT_SHA \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:$SHORT_SHA && \
-        gcloud artifacts docker tags add \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/collab-service:$SHORT_SHA \
-          asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:latest
-
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Resolve-URLs
     entrypoint: bash
@@ -26,7 +13,6 @@ steps:
          echo "USER_SERVICE=$$USER_URL/" >> urls.env
          echo "QUESTION_SERVICE=$$QN_URL/" >> urls.env
          echo "SERVER_URL=$$COLLAB_URL" >> urls.env
-    waitFor: ['Retag']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy
@@ -36,14 +22,13 @@ steps:
       - |
         source urls.env
         gcloud run deploy collab-service-production \
-          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:$SHORT_SHA \
+          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/collab-service:latest \
           --region=asia-southeast1 \
           --platform=managed \
           --allow-unauthenticated \
           --port=1234 \
           --set-secrets=MONGO_DB_URL=MONGO_URI_COLLAB_SERVICE:latest \
-           --set-env-vars=QUESTION_SERVICE=$$QUESTION_SERVICE,USER_SERVICE=$$USER_SERVICE,SERVER_URL=$$SERVER_URL,SESSION_TIMEOUT=3600000,SESSION_UPDATE=60000 \\
-
+          --set-env-vars=QUESTION_SERVICE=$$QUESTION_SERVICE,USER_SERVICE=$$USER_SERVICE,SERVER_URL=$$SERVER_URL,SESSION_TIMEOUT=3600000,SESSION_UPDATE=60000 \
           --memory=1Gi \
           --cpu=2 \
           --min-instances=1 \
@@ -57,3 +42,4 @@ tags:
   - collab-service
 
 timeout: 900s
+
