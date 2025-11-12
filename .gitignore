@@ -4,4 +4,3 @@
 **/.*env
 .vscode/
 .DS_Store
-collab-service/app
