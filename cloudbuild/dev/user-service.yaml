@@ -56,17 +56,6 @@ steps:
 images:
   - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/user-service:$SHORT_SHA
 
-availableSecrets:
-  secretManager:
-    - env: MONGO_URI_USER_SERVICE
-      versionName: projects/cs3219-peerprep-g30/secrets/MONGO_URI_USER_SERVICE/versions/latest
-    - env: JWT_SECRET
-      versionName: projects/cs3219-peerprep-g30/secrets/JWT_SECRET/versions/latest
-    - env: SENDGRID_API_KEY
-      versionName: projects/cs3219-peerprep-g30/secrets/SENDGRID_API_KEY/versions/latest
-    - env: GCS_BUCKET_NAME
-      versionName: projects/cs3219-peerprep-g30/secrets/GCS_BUCKET_NAME/versions/latest
-
 tags:
   - dev
   - user-service
