@@ -19,6 +19,11 @@ PeerPrep is an online learning platform designed to help new coders grow through
 ## Project Architecture<a id='project-architecture'></a>
 <img width="1355" height="876" alt="image" src="https://github.com/user-attachments/assets/6f59290a-fbd1-403c-a205-2695c7a8d734" />
 
+### System Architecture
+| Service | Language | Framework | Database | Tools |
+| ------- | -------- | --------- | -------- | ----- |
+| User Service | Javascript | Node.js (Backend) | MongoDB Atlas | SendGrid (Email Verification) |
+|              |            | Express.js (API) |                |                               |
 
 ## Pre-requisites<a id='pre-requisites'></a>
 
