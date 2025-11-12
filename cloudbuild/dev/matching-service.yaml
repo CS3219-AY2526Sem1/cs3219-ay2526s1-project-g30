@@ -33,8 +33,8 @@ steps:
       - |
         COLLAB_URL=$(gcloud run services describe collab-service-dev --region=asia-southeast1 --format='value(status.url)')
         QN_URL=$(gcloud run services describe question-service-dev --region=asia-southeast1 --format='value(status.url)')
-        echo "COLLAB_SERVICE_URL=${COLLAB_URL}" >> urls.env
-        echo "QUESTION_SERVICE_URL=${QN_URL}" >> urls.env
+        echo "COLLAB_SERVICE_URL=$$COLLAB_URL" >> urls.env
+        echo "QUESTION_SERVICE_URL=$$QN_URL" >> urls.env
     waitFor: ['Build']
 
   - name: gcr.io/cloud-builders/docker
@@ -52,18 +52,18 @@ steps:
       - -c
       - |
         source urls.env
-        gcloud run deploy matching-service-dev \
-          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/matching-service:$SHORT_SHA \
-          --region=asia-southeast1 \
-          --platform=managed \
-          --allow-unauthenticated \
-          --port=8080 \
-          --set-env-vars=COLLAB_SERVICE_URL=$COLLAB_SERVICE_URL,QUESTION_SERVICE_URL=$QUESTION_SERVICE_URL \
-          --memory=256Mi \
-          --cpu=1 \
-          --min-instances=0 \
-          --max-instances=3 \
-          --timeout=60
+         gcloud run deploy matching-service-dev \
+           --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/matching-service:$SHORT_SHA \
+           --region=asia-southeast1 \
+           --platform=managed \
+           --allow-unauthenticated \
+           --port=8080 \
+           --set-env-vars=COLLAB_SERVICE_URL=$$COLLAB_SERVICE_URL,QUESTION_SERVICE_URL=$$QUESTION_SERVICE_URL \
+           --memory=512Mi \
+           --cpu=1 \
+           --min-instances=0 \
+           --max-instances=3 \
+           --timeout=60
     waitFor: ['Push','Resolve-URLs']
 
 images:

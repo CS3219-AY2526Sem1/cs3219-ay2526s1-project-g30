@@ -20,8 +20,8 @@ steps:
     args:
       - -c
       - |
-        USER_URL=$(gcloud run services describe user-service-production --region=asia-southeast1 --format='value(status.url)')
-        echo "USER_SERVICE_URL=${USER_URL}/api/users" >> urls.env
+         USER_URL=$(gcloud run services describe user-service-production --region=asia-southeast1 --format='value(status.url)')
+         echo "USER_SERVICE_URL=$$USER_URL/api/users" >> urls.env
     waitFor: ['Retag']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -38,11 +38,11 @@ steps:
           --allow-unauthenticated \
           --port=4000 \
           --set-secrets=MONGO_URI=MONGO_URI_QUESTION_SERVICE:latest \
-          --set-env-vars=USER_SERVICE_URL=$USER_SERVICE_URL \
+          --set-env-vars=USER_SERVICE_URL=$$USER_SERVICE_URL \\
           --memory=512Mi \
           --cpu=1 \
           --min-instances=1 \
-          --max-instances=10 \
+          --max-instances=100 \
           --timeout=60
     waitFor: ['Resolve-URLs']
 

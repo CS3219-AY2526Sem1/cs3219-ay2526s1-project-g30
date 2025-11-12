@@ -36,12 +36,17 @@ steps:
           --region=asia-southeast1 \
           --platform=managed \
           --format='value(status.url)')
-        QN_URL=$(gcloud run services describe question-service-dev \
-          --region=asia-southeast1 \
-          --platform=managed \
-          --format='value(status.url)')
-        echo "export USER_SERVICE=${USER_URL}/" >> /workspace/env_vars.sh
-        echo "export QUESTION_SERVICE=${QN_URL}" >> /workspace/env_vars.sh
+         QN_URL=$(gcloud run services describe question-service-dev \
+           --region=asia-southeast1 \
+           --platform=managed \
+           --format='value(status.url)')
+         COLLAB_URL=$(gcloud run services describe collab-service-dev \
+           --region=asia-southeast1 \
+           --platform=managed \
+           --format='value(status.url)')
+         echo "export USER_SERVICE=$$USER_URL/" >> /workspace/env_vars.sh
+         echo "export QUESTION_SERVICE=$$QN_URL/" >> /workspace/env_vars.sh
+         echo "export SERVER_URL=$$COLLAB_URL" >> /workspace/env_vars.sh
     waitFor: ['Build']
 
   - name: gcr.io/cloud-builders/docker
@@ -60,7 +65,7 @@ steps:
       - |
         set -eu
         source /workspace/env_vars.sh
-        ENV_VARS="QUESTION_SERVICE=${QUESTION_SERVICE},USER_SERVICE=${USER_SERVICE},SESSION_TIMEOUT=3600000,SESSION_UPDATE=60000"
+         ENV_VARS="QUESTION_SERVICE=$$QUESTION_SERVICE,USER_SERVICE=$$USER_SERVICE,SERVER_URL=$$SERVER_URL,SESSION_TIMEOUT=3600000,SESSION_UPDATE=60000"
         gcloud run deploy collab-service-dev \
           --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/collab-service:$SHORT_SHA \
           --region=asia-southeast1 \
@@ -68,7 +73,7 @@ steps:
           --allow-unauthenticated \
           --port=1234 \
           --set-secrets=MONGO_DB_URL=MONGO_URI_COLLAB_SERVICE:latest \
-          --set-env-vars="${ENV_VARS}" \
+          --set-env-vars="$$ENV_VARS" \
           --memory=1Gi \
           --cpu=2 \
           --min-instances=0 \
