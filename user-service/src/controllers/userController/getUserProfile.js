@@ -1,17 +1,21 @@
 const User = require('../../models/User');
+const mongoose = require('mongoose');
 
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
+    const { username } = req.params;
 
-    if (user) {
-      res.json(user);
-    } else {
-      res.status(404).json({ message: 'User not found' });
+    const user = await User.findOne({ username: username }).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
+
+    res.json(user);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).send('Server Error');
+    console.error("Error in getUserProfile:", err);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
