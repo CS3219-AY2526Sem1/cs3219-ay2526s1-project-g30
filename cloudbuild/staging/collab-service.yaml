@@ -74,11 +74,6 @@ substitutions:
 images:
   - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/collab-service:$SHORT_SHA
 
-availableSecrets:
-  secretManager:
-    - env: MONGO_URI_COLLAB_SERVICE
-      versionName: projects/cs3219-peerprep-g30/secrets/MONGO_URI_COLLAB_SERVICE/versions/latest
-
 tags:
   - staging
   - collab-service

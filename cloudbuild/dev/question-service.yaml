@@ -45,7 +45,7 @@ steps:
       - --platform=managed
       - --allow-unauthenticated
       - --port=4000
-      - --set-secrets=MONGO_URI=dev-MONGO_URI_QUESTION_SERVICE:latest,USER_SERVICE_URL=dev-USER_SERVICE_URL:latest
+      - --set-secrets=MONGO_URI=MONGO_URI_QUESTION_SERVICE:latest
       - --memory=512Mi
       - --cpu=1
       - --min-instances=0
@@ -55,13 +55,6 @@ steps:
 
 images:
   - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/question-service:$SHORT_SHA
-
-availableSecrets:
-  secretManager:
-    - env: dev-MONGO_URI_QUESTION_SERVICE
-      versionName: projects/cs3219-peerprep-g30/secrets/dev-MONGO_URI_QUESTION_SERVICE/versions/latest
-    - env: dev-USER_SERVICE_URL
-      versionName: projects/cs3219-peerprep-g30/secrets/dev-USER_SERVICE_URL/versions/latest
 
 tags:
   - dev
