@@ -1,6 +1,6 @@
 // AI Assistance Disclosure:
 // Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-14
-// Scope: Generated mock functions for test.
+// Scope: Implemented mock functions for test.
 // Author review: Validated correctness and done test.
 package main
 
