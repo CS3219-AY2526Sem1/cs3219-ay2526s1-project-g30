@@ -1,7 +1,32 @@
 # Production - user-service
-# Deploys the latest staging image to production
+options:
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
+  # Pull the latest staging image
+  - name: gcr.io/cloud-builders/docker
+    id: Pull-Staging
+    args:
+      - pull
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:latest
+
+  # Re-tag to production repository
+  - name: gcr.io/cloud-builders/docker
+    id: Tag-Production
+    args:
+      - tag
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:latest
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/user-service:latest
+    waitFor: ['Pull-Staging']
+
+  # Push to production repository
+  - name: gcr.io/cloud-builders/docker
+    id: Push-Production
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/user-service:latest
+    waitFor: ['Tag-Production']
+
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy
     entrypoint: gcloud
@@ -9,7 +34,7 @@ steps:
       - run
       - deploy
       - user-service-production
-      - --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:latest
+      - --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/user-service:latest
       - --region=asia-southeast1
       - --platform=managed
       - --allow-unauthenticated
@@ -20,6 +45,10 @@ steps:
       - --min-instances=1
       - --max-instances=100
       - --timeout=60
+    waitFor: ['Push-Production']
+
+images:
+  - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/user-service:latest
 
 tags:
   - production

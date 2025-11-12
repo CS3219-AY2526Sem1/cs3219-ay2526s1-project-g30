@@ -1,6 +1,32 @@
 # Production - collab-service
+options:
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
+  # Pull the latest staging image
+  - name: gcr.io/cloud-builders/docker
+    id: Pull-Staging
+    args:
+      - pull
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/collab-service:latest
+
+  # Re-tag to production repository
+  - name: gcr.io/cloud-builders/docker
+    id: Tag-Production
+    args:
+      - tag
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/collab-service:latest
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:latest
+    waitFor: ['Pull-Staging']
+
+  # Push to production repository
+  - name: gcr.io/cloud-builders/docker
+    id: Push-Production
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:latest
+    waitFor: ['Tag-Production']
+
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Resolve-URLs
     entrypoint: bash
@@ -13,6 +39,7 @@ steps:
          echo "USER_SERVICE=$$USER_URL/" >> urls.env
          echo "QUESTION_SERVICE=$$QN_URL/" >> urls.env
          echo "SERVER_URL=$$COLLAB_URL" >> urls.env
+    waitFor: ['Push-Production']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy
@@ -22,7 +49,7 @@ steps:
       - |
         source urls.env
         gcloud run deploy collab-service-production \
-          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/collab-service:latest \
+          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:latest \
           --region=asia-southeast1 \
           --platform=managed \
           --allow-unauthenticated \
@@ -36,6 +63,9 @@ steps:
           --timeout=3600 \
           --session-affinity
     waitFor: ['Resolve-URLs']
+
+images:
+  - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:latest
 
 tags:
   - production

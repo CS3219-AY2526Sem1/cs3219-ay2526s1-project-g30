@@ -1,4 +1,6 @@
 # Staging - ui-service
+options:
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
   - name: node:lts-alpine

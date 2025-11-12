@@ -1,4 +1,6 @@
 # Dev - collab-service (WebSocket)
+options:
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
   - name: node:lts-alpine
@@ -65,7 +67,7 @@ steps:
       - |
         set -eu
         source /workspace/env_vars.sh
-         ENV_VARS="QUESTION_SERVICE=$$QUESTION_SERVICE,USER_SERVICE=$$USER_SERVICE,SERVER_URL=$$SERVER_URL,SESSION_TIMEOUT=3600000,SESSION_UPDATE=60000"
+        ENV_VARS="QUESTION_SERVICE=$$QUESTION_SERVICE,USER_SERVICE=$$USER_SERVICE,SERVER_URL=$$SERVER_URL,SESSION_TIMEOUT=3600000,SESSION_UPDATE=60000"
         gcloud run deploy collab-service-dev \
           --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/collab-service:$SHORT_SHA \
           --region=asia-southeast1 \
