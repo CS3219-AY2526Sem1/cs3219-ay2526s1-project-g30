@@ -30,7 +30,7 @@ export function ChatMessagesList({
       className="flex-1 overflow-y-auto"
       onScroll={onScroll}
     >
-      <div className="flex flex-col gap-3 items-start px-2 py-4 w-full h-full">
+      <div className="flex flex-col gap-3 items-start px-2 py-4 pb-16 w-full h-full">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center w-full h-full">
             <p className="text-sm text-muted-foreground">
