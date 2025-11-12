@@ -25,6 +25,20 @@ steps:
       - question-service
     waitFor: ['Test']
 
+  - name: gcr.io/cloud-builders/docker
+    id: Push
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/question-service:$SHORT_SHA
+    waitFor: ['Build']
+  
+  - name: gcr.io/cloud-builders/docker
+    id: Push-latest
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/question-service:latest
+    waitFor: ['Build']
+
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Resolve-URLs
     entrypoint: bash
@@ -36,7 +50,7 @@ steps:
           --region=asia-southeast1 \
           --platform=managed \
           --format='value(status.url)')
-        echo "export USER_SERVICE_URL=${USER_URL}/api/users" >> /workspace/env_vars.sh
+        echo "export USER_SERVICE_URL=$$USER_URL/api/users" >> /workspace/env_vars.sh
     waitFor: ['Build']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -54,16 +68,17 @@ steps:
           --allow-unauthenticated \
           --port=4000 \
           --set-secrets=MONGO_URI=MONGO_URI_QUESTION_SERVICE:latest \
-          --set-env-vars=USER_SERVICE_URL=${USER_SERVICE_URL} \
+          --set-env-vars=USER_SERVICE_URL=$$USER_SERVICE_URL \
           --memory=512Mi \
           --cpu=1 \
           --min-instances=0 \
           --max-instances=3 \
           --timeout=60
-    waitFor: ['Resolve-URLs']
+    waitFor: ['Resolve-URLs', 'Push', 'Push-latest']
 
 images:
   - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/question-service:$SHORT_SHA
+  - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/question-service:latest
 
 tags:
   - dev

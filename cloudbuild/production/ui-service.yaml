@@ -24,11 +24,11 @@ steps:
         QN_URL=$(gcloud run services describe question-service-production --region=asia-southeast1 --format='value(status.url)')
         MATCH_URL=$(gcloud run services describe matching-service-production --region=asia-southeast1 --format='value(status.url)')
         COLLAB_URL=$(gcloud run services describe collab-service-production --region=asia-southeast1 --format='value(status.url)')
-        echo "NEXT_PUBLIC_USER_SERVICE_URL=${USER_URL}/api/users" >> urls.env
-        echo "NEXT_PUBLIC_QUESTION_SERVICE_URL=${QN_URL}" >> urls.env
-        echo "NEXT_PUBLIC_MATCHING_SERVICE_URL=${MATCH_URL}/api/v1" >> urls.env
-        echo "NEXT_PUBLIC_COLLAB_SERVICE_URL=${COLLAB_URL}/" >> urls.env
-        echo "NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=wss://${COLLAB_URL#https://}/" >> urls.env
+         echo "NEXT_PUBLIC_USER_SERVICE_URL=$$USER_URL/api/users" >> urls.env
+         echo "NEXT_PUBLIC_QUESTION_SERVICE_URL=$$QN_URL" >> urls.env
+         echo "NEXT_PUBLIC_MATCHING_SERVICE_URL=$$MATCH_URL/api/v1" >> urls.env
+         echo "NEXT_PUBLIC_COLLAB_SERVICE_URL=$$COLLAB_URL/" >> urls.env
+         echo "NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=wss://$${COLLAB_URL#https://}/" >> urls.env
     waitFor: ['Retag']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
@@ -44,11 +44,12 @@ steps:
           --platform=managed \
           --allow-unauthenticated \
           --port=3000 \
-          --memory=512Mi \
+          --memory=1Gi \
           --cpu=1 \
           --min-instances=1 \
-          --max-instances=10 \
-          --timeout=60
+          --max-instances=100 \
+          --timeout=720 \
+          --session-affinity
     waitFor: ['Resolve-URLs']
 
 tags:
