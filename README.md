@@ -17,6 +17,7 @@
 PeerPrep is an online learning platform designed to help new coders grow through collaboration and peer learning. It provides an interactive environment where users can connect with others of similar skill levels and practice solving common coding interview questions together in real time. PeerPrep promotes learning helping beginners strengthen their coding skills, build confidence, and prepare more effectively for technical interviews.
 
 ## Project Architecture<a id='project-architecture'></a>
+<img width="1355" height="876" alt="image" src="https://github.com/user-attachments/assets/6f59290a-fbd1-403c-a205-2695c7a8d734" />
 
 
 ## Pre-requisites<a id='pre-requisites'></a>
@@ -28,4 +29,4 @@ PeerPrep is an online learning platform designed to help new coders grow through
 
 
 ## AI Usage Documentation<a id='ai-usage-documentation'></a>
-Refer to  [`ai/usage-log.md`](./ai/usage-log.md) for a record of how AI was used in the development of PeerPrep.
+Refer to  [`ai/`](./ai/) for a record of how AI was used in the development of PeerPrep for the different services.
