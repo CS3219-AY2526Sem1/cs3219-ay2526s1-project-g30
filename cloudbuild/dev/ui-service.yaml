@@ -1,5 +1,7 @@
 # Dev - ui-service
 # Builds Next.js app and deploys to Cloud Run dev service
+options:
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
   - name: node:lts-alpine
