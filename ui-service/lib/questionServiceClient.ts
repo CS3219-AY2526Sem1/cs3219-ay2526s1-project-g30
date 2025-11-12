@@ -9,6 +9,7 @@ import 'server-only';
 
 import { config } from './config';
 import { logOutgoingRequest, logIncomingResponse, logServiceError, logTiming } from './logger';
+import { cacheLife, cacheTag } from 'next/cache';
 
 export class QuestionServiceError extends Error {
   constructor(
@@ -148,11 +149,6 @@ export async function fetchQuestion(questionId: string): Promise<Question> {
 
 /**
  * Fetches a random question by difficulty and category (optional).
- *
- * @param difficulty The difficulty level (easy, medium, hard)
- * @param category Optional category to filter by
- * @returns The question ID
- * @throws QuestionServiceError if the request fails or no questions are found
  */
 export async function fetchRandomQuestion(
   difficulty: string,
@@ -176,12 +172,13 @@ export async function fetchRandomQuestion(
   const timeoutId = setTimeout(() => controller.abort(), config.questionService.timeout);
 
   try {
-    const url = `${config.questionService.baseUrl}${endpoint}`;
+   const url = `${config.questionService.baseUrl}${endpoint}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
+      cache: 'no-store',
       signal: controller.signal,
     });
 
@@ -270,20 +267,11 @@ export async function fetchRandomQuestion(
   }
 }
 
-/**
- * Interface for question statistics including available categories and difficulty counts.
- */
 export interface QuestionStats {
   categories: string[];
   difficultyCounts: Record<string, Record<'easy' | 'medium' | 'hard', number>>;
 }
 
-/**
- * Fetches statistics about available questions (categories and difficulty levels).
- *
- * @returns Statistics including available categories and difficulty counts per category
- * @throws QuestionServiceError if the request fails
- */
 export async function fetchQuestionStats(): Promise<QuestionStats> {
   const endpoint = '/stats';
   const startTime = Date.now();
@@ -372,4 +360,13 @@ export async function fetchQuestionStats(): Promise<QuestionStats> {
     });
     throw new QuestionServiceError(500, 'Unknown error while fetching question stats');
   }
+}
+
+export async function fetchQuestionStatsCached(): Promise<QuestionStats> {
+  'use cache';
+
+  cacheLife('minutes');
+  cacheTag('question-stats');
+
+  return fetchQuestionStats();
 }

@@ -540,8 +540,8 @@ export async function fetchQuestionStatsAction(): Promise<{
   error?: string;
 }> {
   try {
-    const { fetchQuestionStats } = await import('@/lib/questionServiceClient');
-    const stats = await fetchQuestionStats();
+    const { fetchQuestionStatsCached } = await import('@/lib/questionServiceClient');
+    const stats = await fetchQuestionStatsCached();
     return {
       success: true,
       stats,

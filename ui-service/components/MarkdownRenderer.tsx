@@ -11,172 +11,182 @@ interface MarkdownRendererProps {
   className?: string
   textSize?: number
   isDark?: boolean
-}
-
-interface MarkdownRendererInternalProps extends MarkdownRendererProps {
   isCompact?: boolean
 }
 
-/**
- * MarkdownRenderer component provides consistent Markdown rendering across the application.
- * Supports GitHub-flavoured Markdown including tables, strikethrough, and task lists.
- * Styling is automatically applied to match the design system.
- * 
- * @param isCompact - When true, removes extra margins/padding for inline content (e.g., chat messages)
- * @param isDark - When true, uses darker backgrounds for code blocks (for light text contexts like sent messages)
- */
+function createComponents({
+  textSize,
+  isDark,
+  isCompact,
+}: {
+  textSize: number
+  isDark: boolean
+  isCompact: boolean
+}) {
+  return {
+    h1: ({ node, ...props }: any) => (
+      <h1 className="text-xl font-bold mt-4 mb-2" {...props} />
+    ),
+    h2: ({ node, ...props }: any) => (
+      <h2 className="text-lg font-semibold mt-3 mb-2" {...props} />
+    ),
+    h3: ({ node, ...props }: any) => (
+      <h3 className="text-base font-semibold mt-2 mb-1" {...props} />
+    ),
+    h4: ({ node, ...props }: any) => <h4 className="font-semibold" {...props} />,
+    h5: ({ node, ...props }: any) => <h5 className="font-semibold" {...props} />,
+    h6: ({ node, ...props }: any) => <h6 className="font-semibold" {...props} />,
+
+    p: ({ node, ...props }: any) => (
+      <p
+        className={cn('leading-relaxed', !isCompact && 'mb-3')}
+        style={{ fontSize: `${textSize}px` }}
+        {...props}
+      />
+    ),
+
+    ul: ({ node, ...props }: any) => (
+      <ul
+        className={cn('list-disc list-inside space-y-1', !isCompact && 'mb-3')}
+        {...props}
+      />
+    ),
+    ol: ({ node, ...props }: any) => (
+      <ol
+        className={cn('list-decimal list-inside space-y-1', !isCompact && 'mb-3')}
+        {...props}
+      />
+    ),
+    li: ({ node, ...props }: any) => (
+      <li style={{ fontSize: `${textSize}px` }} {...props} />
+    ),
+
+    pre: ({ node, ...props }: any) => (
+      <pre
+        className={cn(
+          'border rounded-lg p-4 overflow-x-auto',
+          isDark ? 'bg-white/20 border-white/20' : 'bg-muted border-border',
+          !isCompact && 'mb-3',
+        )}
+        {...props}
+      />
+    ),
+    code: ({ node, inline = false, children, ...props }: any) => {
+      if (inline) {
+        return (
+          <code
+            className={cn(
+              'px-1.5 py-0.5 rounded text-sm font-mono',
+              isDark ? 'bg-white/20' : 'bg-muted',
+            )}
+            {...props}
+          >
+            {children}
+          </code>
+        )
+      }
+      return (
+        <code
+          className="block font-mono text-sm"
+          style={{ fontSize: `${textSize - 2}px` }}
+          {...props}
+        >
+          {children}
+        </code>
+      )
+    },
+
+    blockquote: ({ node, ...props }: any) => (
+      <blockquote
+        className={cn(
+          'border-l-4 border-primary pl-4 italic',
+          !isCompact && 'my-3',
+        )}
+        {...props}
+      />
+    ),
+
+    a: ({ node, ...props }: any) => (
+      <a
+        className="text-primary hover:underline wrap-break-word"
+        target="_blank"
+        rel="noopener noreferrer"
+        {...props}
+      />
+    ),
+
+    hr: ({ node, ...props }: any) => (
+      <hr className={cn('border-border', !isCompact && 'my-4')} {...props} />
+    ),
+
+    table: ({ node, ...props }: any) => (
+      <table
+        className={cn(
+          'border-collapse border border-border',
+          !isCompact && 'my-3',
+        )}
+        {...props}
+      />
+    ),
+    thead: ({ node, ...props }: any) => (
+      <thead className="bg-muted" {...props} />
+    ),
+    tbody: ({ node, ...props }: any) => <tbody {...props} />,
+    tr: ({ node, ...props }: any) => (
+      <tr className="border-b border-border" {...props} />
+    ),
+    td: ({ node, ...props }: any) => (
+      <td className="border border-border px-3 py-2" {...props} />
+    ),
+    th: ({ node, ...props }: any) => (
+      <th
+        className="border border-border px-3 py-2 font-semibold bg-muted"
+        {...props}
+      />
+    ),
+
+    strong: ({ node, ...props }: any) => (
+      <strong className="font-bold" {...props} />
+    ),
+    em: ({ node, ...props }: any) => <em className="italic" {...props} />,
+
+    input: ({ node, type, checked, ...props }: any) => {
+      if (type === 'checkbox') {
+        return (
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled
+            className="mr-2 cursor-not-allowed"
+            {...props}
+          />
+        )
+      }
+      return <input type={type} {...props} />
+    },
+
+    br: ({ node, ...props }: any) => <br {...props} />,
+  }
+}
+
 export function MarkdownRenderer({
   content,
   className,
   textSize = 14,
-  isCompact = false,
   isDark = false,
-}: MarkdownRendererInternalProps) {
+  isCompact = false,
+}: MarkdownRendererProps) {
+  const components = React.useMemo(
+    () => createComponents({ textSize, isDark, isCompact }),
+    [textSize, isDark, isCompact],
+  )
+
   return (
     <div className={cn('markdown-content', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
-        components={{
-        // Headings
-        h1: ({ node, ...props }) => (
-          <h1 className="text-xl font-bold mt-4 mb-2" {...props} />
-        ),
-        h2: ({ node, ...props }) => (
-          <h2 className="text-lg font-semibold mt-3 mb-2" {...props} />
-        ),
-        h3: ({ node, ...props }) => (
-          <h3 className="text-base font-semibold mt-2 mb-1" {...props} />
-        ),
-        h4: ({ node, ...props }) => (
-          <h4 className="font-semibold" {...props} />
-        ),
-        h5: ({ node, ...props }) => (
-          <h5 className="font-semibold" {...props} />
-        ),
-        h6: ({ node, ...props }) => (
-          <h6 className="font-semibold" {...props} />
-        ),
-
-        // Paragraph
-        p: ({ node, ...props }) => (
-          <p
-            className={cn('leading-relaxed', !isCompact && 'mb-3')}
-            style={{ fontSize: `${textSize}px` }}
-            {...props}
-          />
-        ),
-
-        // Lists
-        ul: ({ node, ...props }) => (
-          <ul className={cn('list-disc list-inside space-y-1', !isCompact && 'mb-3')} {...props} />
-        ),
-        ol: ({ node, ...props }) => (
-          <ol className={cn('list-decimal list-inside space-y-1', !isCompact && 'mb-3')} {...props} />
-        ),
-        li: ({ node, ...props }) => (
-          <li style={{ fontSize: `${textSize}px` }} {...props} />
-        ),
-
-        // Code blocks
-        pre: ({ node, ...props }) => (
-          <pre className={cn(
-            'border rounded-lg p-4 overflow-x-auto',
-            isDark ? 'bg-white/20 border-white/20' : 'bg-muted border-border',
-            !isCompact && 'mb-3'
-          )} {...props} />
-        ),
-        code: ({ node, inline = false, children, ...props }: any) => {
-          if (inline) {
-            return (
-              <code
-                className={cn(
-                  'px-1.5 py-0.5 rounded text-sm font-mono',
-                  isDark ? 'bg-white/20' : 'bg-muted'
-                )}
-                {...props}
-              >
-                {children}
-              </code>
-            )
-          }
-          return (
-            <code
-              className="block font-mono text-sm"
-              style={{ fontSize: `${textSize - 2}px` }}
-              {...props}
-            >
-              {children}
-            </code>
-          )
-        },
-
-        // Blockquote
-        blockquote: ({ node, ...props }) => (
-          <blockquote
-            className={cn('border-l-4 border-primary pl-4 italic', !isCompact && 'my-3')}
-            {...props}
-          />
-        ),
-
-        // Links
-        a: ({ node, ...props }) => (
-          <a
-            className="text-primary hover:underline wrap-break-word"
-            target="_blank"
-            rel="noopener noreferrer"
-            {...props}
-          />
-        ),
-
-        // Horizontal rule
-        hr: ({ node, ...props }) => <hr className={cn('border-border', !isCompact && 'my-4')} {...props} />,
-
-        // Table (GitHub-flavoured Markdown)
-        table: ({ node, ...props }) => (
-          <table className={cn('border-collapse border border-border', !isCompact && 'my-3')} {...props} />
-        ),
-        thead: ({ node, ...props }) => (
-          <thead className="bg-muted" {...props} />
-        ),
-        tbody: ({ node, ...props }) => <tbody {...props} />,
-        tr: ({ node, ...props }) => (
-          <tr className="border-b border-border" {...props} />
-        ),
-        td: ({ node, ...props }) => (
-          <td className="border border-border px-3 py-2" {...props} />
-        ),
-        th: ({ node, ...props }) => (
-          <th className="border border-border px-3 py-2 font-semibold bg-muted" {...props} />
-        ),
-
-        // Strong and emphasis
-        strong: ({ node, ...props }) => (
-          <strong className="font-bold" {...props} />
-        ),
-        em: ({ node, ...props }) => (
-          <em className="italic" {...props} />
-        ),
-
-        // Task lists (GitHub-flavoured Markdown)
-        input: ({ node, type, checked, ...props }: any) => {
-          if (type === 'checkbox') {
-            return (
-              <input
-                type="checkbox"
-                checked={checked}
-                disabled
-                className="mr-2 cursor-not-allowed"
-                {...props}
-              />
-            )
-          }
-          return <input type={type} {...props} />
-        },
-
-        // Break
-        br: ({ node, ...props }) => <br {...props} />,
-        }} 
+        components={components as any}
       >
         {content}
       </ReactMarkdown>

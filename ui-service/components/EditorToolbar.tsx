@@ -35,7 +35,7 @@ import {
 interface EditorToolbarProps {
   isEditorOnLeft: boolean
   onSwapPanels: () => void
-  isVerticalSplit: boolean
+  isHorizontalSplit: boolean
   onToggleSplitDirection: () => void
   textSize: number
   onTextSizeChange: (size: number) => void
@@ -49,7 +49,7 @@ const TEXT_SIZE_PRESETS = [10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
 export function EditorToolbar({
   isEditorOnLeft,
   onSwapPanels,
-  isVerticalSplit,
+  isHorizontalSplit,
   onToggleSplitDirection,
   textSize,
   onTextSizeChange,
@@ -272,13 +272,13 @@ export function EditorToolbar({
                 size="sm"
                 onClick={onToggleSplitDirection}
               >
-                {isVerticalSplit ? <Columns2 /> : <Rows2 />}
+                {isHorizontalSplit ? <Columns2 /> : <Rows2 />}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              {isVerticalSplit
-                ? 'Switch to horizontal split'
-                : 'Switch to vertical split'}
+              {isHorizontalSplit
+                ? 'Switch to vertical split'
+                : 'Switch to horizontal split'}
             </TooltipContent>
           </Tooltip>
 

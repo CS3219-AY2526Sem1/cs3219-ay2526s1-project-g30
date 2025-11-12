@@ -98,6 +98,7 @@ export function createChatClient({
   const maxReconnectAttempts = 5;
   const reconnectDelay = 1000; // ms
   let reconnectTimeout: NodeJS.Timeout | null = null;
+  let isTerminating = false;
 
   // Mutable callbacks for runtime updates
   let callbacks = {
@@ -211,6 +212,12 @@ export function createChatClient({
       });
 
       ws.addEventListener('error', (event) => {
+        if (isTerminating) {
+          console.log('[Chat Client] WebSocket error during intentional termination, suppressing callbacks')
+          isConnecting = false
+          return
+        }
+
         console.error('[Chat Client] WebSocket error:', {
           readyState: ws?.readyState,
           url: ws?.url,
@@ -234,6 +241,11 @@ export function createChatClient({
         ws = null;
 
         // Handle different close codes
+        if (isTerminating) {
+          console.log('[Chat Client] Close during intentional termination, not reconnecting or notifying')
+          return
+        }
+
         if (event.code === 3000 || event.code === 4001) {
           // Session ended - don't reconnect
           console.log('[Chat Client] Session ended, not reconnecting');
@@ -278,6 +290,8 @@ export function createChatClient({
   };
 
   const disconnect = () => {
+    console.log('[Chat Client] Disconnect requested')
+    isTerminating = true
     console.log('[Chat Client] Disconnecting');
 
     if (reconnectTimeout) {

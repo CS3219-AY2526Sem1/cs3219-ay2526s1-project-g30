@@ -7,7 +7,7 @@
 
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, updateTag } from 'next/cache';
 import * as userProfileManager from '@/lib/userProfileManager';
 import type { UserProfile, ProfileUpdatePayload } from '@/lib/userProfileManager';
 import {
@@ -134,6 +134,9 @@ export async function updateUserProfile(
     revalidatePath('/');
     revalidatePath('/settings');
     revalidatePath('/home');
+    if (result?.username) {
+      updateTag(`user-profile:${result.username}`);
+    }
 
     logServerActionSuccess('updateUserProfile (profile action)', {
       userId: result?.userId,
@@ -299,6 +302,9 @@ export async function uploadProfilePicture(
     revalidatePath('/');
     revalidatePath('/settings');
     revalidatePath('/home');
+    if (result?.username) {
+      updateTag(`user-profile:${result.username}`);
+    }
 
     logServerActionSuccess('uploadProfilePicture', {
       userId: result?.userId,
@@ -346,6 +352,9 @@ export async function removeProfilePicture(): Promise<UserProfile | null> {
     revalidatePath('/');
     revalidatePath('/settings');
     revalidatePath('/home');
+    if (result?.username) {
+      updateTag(`user-profile:${result.username}`);
+    }
 
     logServerActionSuccess('removeProfilePicture', {
       userId: result?.userId,
