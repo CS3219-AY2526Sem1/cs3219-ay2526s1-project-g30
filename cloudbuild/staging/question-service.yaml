@@ -32,26 +32,43 @@ steps:
       - --all-tags
       - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/question-service
     waitFor: ['Build']
-
+ 
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Resolve-URLs
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -eu
+        USER_URL=$(gcloud run services describe user-service-staging \
+          --region=asia-southeast1 \
+          --platform=managed \
+          --format='value(status.url)')
+        echo "export USER_SERVICE_URL=$$USER_URL/api/users" >> /workspace/env_vars.sh
+    waitFor: ['Build']
+ 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - run
-      - deploy
-      - question-service-staging
-      - --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/question-service:$SHORT_SHA
-      - --region=asia-southeast1
-      - --platform=managed
-      - --allow-unauthenticated
-      - --port=4000
-      - --set-secrets=MONGO_URI=MONGO_URI_QUESTION_SERVICE:latest,USER_SERVICE_URL=USER_SERVICE_URL:latest
-      - --memory=512Mi
-      - --cpu=1
-      - --min-instances=0
-      - --max-instances=3
-      - --timeout=60
-    waitFor: ['Push']
+      - -c
+      - |
+        set -eu
+        source /workspace/env_vars.sh
+        gcloud run deploy question-service-staging \
+          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/question-service:$SHORT_SHA \
+          --region=asia-southeast1 \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=4000 \
+          --set-secrets=MONGO_URI=MONGO_URI_QUESTION_SERVICE:latest \
+          --set-env-vars=USER_SERVICE_URL=$$USER_SERVICE_URL \
+          --memory=512Mi \
+          --cpu=1 \
+          --min-instances=0 \
+          --max-instances=3 \
+          --timeout=60
+    waitFor: ['Resolve-URLs','Push']
 
 substitutions:
   _PR_NUMBER: ''
