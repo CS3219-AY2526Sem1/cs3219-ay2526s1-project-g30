@@ -1,4 +1,6 @@
 # Production - question-service
+options:
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim

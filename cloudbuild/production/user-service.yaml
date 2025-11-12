@@ -1,5 +1,7 @@
 # Production - user-service
 # Deploys the latest staging image to production
+options:
+  logging: CLOUD_LOGGING_ONLY
 
 steps:
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
