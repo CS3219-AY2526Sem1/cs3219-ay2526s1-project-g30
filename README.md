@@ -139,4 +139,13 @@ docker run --env-file .env ui-service
 
 
 ## AI Usage Documentation<a id='ai-usage-documentation'></a>
+AI Use Summary
+Prohibited phases avoided: requirements elicitation; architecture/design decisions.
+Allowed uses:
+- Generating boilerplate and implementation code
+- Refactoring codebase
+- Debugging code and deployment
+
+Verification: All AI outputs reviewed, edited, and tested by the authors.
+
 Refer to the [`ai/`](./ai/) folder for records of how AI was used in the development of PeerPrep for the different services.
