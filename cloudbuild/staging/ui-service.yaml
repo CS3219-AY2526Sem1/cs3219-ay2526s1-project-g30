@@ -60,21 +60,25 @@ steps:
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - run
-      - deploy
-      - ui-service-staging
-      - --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service:$SHORT_SHA
-      - --region=asia-southeast1
-      - --platform=managed
-      - --allow-unauthenticated
-      - --port=3000
-       - --memory=1Gi
-      - --cpu=1
-      - --min-instances=0
-      - --max-instances=3
-       - --timeout=720
+      - -c
+      - |
+        set -eu
+        source urls.env
+        gcloud run deploy ui-service-staging \
+          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/ui-service:$SHORT_SHA \
+          --region=asia-southeast1 \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=3000 \
+          --memory=1Gi \
+          --cpu=1 \
+          --min-instances=0 \
+          --max-instances=3 \
+          --timeout=720 \
+          --set-secrets=SESSION_SECRET=SESSION_SECRET:latest \
+          --set-env-vars=NEXT_PUBLIC_USER_SERVICE_URL=$$NEXT_PUBLIC_USER_SERVICE_URL,NEXT_PUBLIC_QUESTION_SERVICE_URL=$$NEXT_PUBLIC_QUESTION_SERVICE_URL,NEXT_PUBLIC_MATCHING_SERVICE_URL=$$NEXT_PUBLIC_MATCHING_SERVICE_URL,NEXT_PUBLIC_COLLAB_SERVICE_URL=$$NEXT_PUBLIC_COLLAB_SERVICE_URL,NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=$$NEXT_PUBLIC_COLLAB_SERVICE_WS_URL
     waitFor: ['Push']
 
 availableSecrets:
