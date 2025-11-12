@@ -30,8 +30,12 @@ PeerPrep is an online learning platform designed to help new coders grow through
 | Project-Wide (DevOps) | YAML<br>JSON | N/A | N/A | Google Cloud Platform (Cloud Run, Cloud Build, Artifact Registry, Secret Manager)<br>Docker, Docker Compose, Git & GitHub, Postman |
 
 ## Pre-requisites<a id='pre-requisites'></a>
-
-
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Node.js | LTS | For all JavaScript based services |
+| npm | latest | Dependency management |
+| Go | latest | For matching-service |
+| Docker | latest | Running containers |
 
 ## How to Deploy PeerPrep locally<a id='how-to-deploy-peerprep-locally'></a>
 
