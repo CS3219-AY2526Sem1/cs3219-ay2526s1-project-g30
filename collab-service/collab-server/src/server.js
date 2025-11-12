@@ -4,6 +4,10 @@
 // Base code taken from https://github.com/yjs/y-websocket-server/tree/main
 // Made extensive changes to suit needs of PeerPrep
 
+// AI Assistance Disclosure:
+// Tool: Claude AI (Sonnet 4.5), date: 2025‑10-05
+// Scope: Debugging errors and issues with connecting with Cloud Run
+// Author review: Validated correctness
 
 import dotenv from 'dotenv'
 import WebSocket from 'ws'
