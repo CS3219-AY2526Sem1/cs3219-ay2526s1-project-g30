@@ -7,13 +7,14 @@
 - The teaching team should be given access to the repositories as we may require viewing the history of the repository in case of any disputes or disagreements. 
 
 ## Table of Contents
-1. [Product Overview](##1-product-overview)
-2. [Project Architecture](##2-project-architecture)
-3. [Pre-requisites](##3-pre-requisites)
-4. [How to Deploy PeerPrep locally](##4-how-to-deploy-peerprep-locally)
+1. [Product Overview](##product-overview)
+2. [Project Architecture](##project-architecture)
+3. [Pre-requisites](##pre-requisites)
+4. [How to Deploy PeerPrep locally](##how-to-deploy-peerprep-locally)
+4. [AI Usage Documentation](##ai-usage-documentation)
 
 ## Product Overview
-
+PeerPrep is an online learning platform designed to help new coders grow through collaboration and peer learning. It provides an interactive environment where users can connect with others of similar skill levels and practice solving common coding interview questions together in real time. PeerPrep promotes learning helping beginners strengthen their coding skills, build confidence, and prepare more effectively for technical interviews.
 
 ## Project Architecture
 
