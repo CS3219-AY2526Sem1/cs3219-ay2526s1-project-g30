@@ -1020,16 +1020,19 @@ export async function getUserProfile(): Promise<User | null> {
  *
  * Server Action that:
  * 1. Deletes the session cookie
- * 2. Redirects to login page
+ * 2. Returns success; client handles navigation
  */
-export async function logout(): Promise<never> {
-  logServerActionStart('logout');
+export async function logout() {
+  logServerActionStart('logout')
 
-  await deleteSession();
+  await deleteSession()
 
   logServerActionSuccess('logout', {
     timestamp: new Date().toISOString(),
-  });
+  })
 
-  redirect('/login');
+  // Let the client handle navigation (e.g. router.push('/login'))
+  return { success: true }
 }
+
+

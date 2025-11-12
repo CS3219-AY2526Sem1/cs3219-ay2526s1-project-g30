@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -22,17 +24,6 @@ interface NavbarWithoutPropsProps {
   userProfile?: User | null
 }
 
-function NavbarSkeleton() {
-  return (
-    <nav className="sticky top-0 z-50 border-b border-gray-800 bg-black">
-      <div className="flex items-center justify-between px-6 py-4">
-        <div className="h-6 w-24 bg-muted animate-pulse rounded" />
-        <div className="size-10 rounded-full bg-muted animate-pulse" />
-      </div>
-    </nav>
-  )
-}
-
 interface UserMenuProps {
   user: User
 }
@@ -40,13 +31,24 @@ interface UserMenuProps {
 function UserMenu({ user }: UserMenuProps) {
   const displayName = user.displayName || user.username
   const profileImageUrl = user.profilePictureUrl || null
+  const [open, setOpen] = useState(false)
+  const router = useRouter()
 
   const handleLogout = async () => {
-    await logout()
+    // Close menu first so Radix unmounts dropdown content
+    setOpen(false)
+
+    const res = await logout()
+
+    // After server confirms logout, navigate to login page
+    if (!res || res.success) {
+      router.push('/login')
+    }
   }
 
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+
       <DropdownMenuTrigger asChild>
         <button className="outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full">
           <Avatar>
@@ -96,7 +98,13 @@ function UserMenu({ user }: UserMenuProps) {
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+          <DropdownMenuItem
+            variant="destructive"
+            onSelect={(event) => {
+              event.preventDefault()
+              handleLogout()
+            }}
+          >
             <LogOut />
             <span>Log out</span>
           </DropdownMenuItem>
