@@ -1,3 +1,7 @@
+// Code credits to dmonad on Github and the respective collaborators
+// Taken from https://github.com/yjs/y-websocket-server/tree/main
+
+
 import http from 'http'
 import * as number from 'lib0/number.js'
 
