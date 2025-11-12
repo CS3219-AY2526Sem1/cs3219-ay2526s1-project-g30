@@ -75,8 +75,8 @@ USER_SERVICE_URL=<insert URL>
 ### /collab-service/collab-server/.env
 ```
 MONGO_DB_URL = <insert URL>
-SESSION_TIMEOUT = '3600000'
-SESSION_UPDATE = '5000'
+SESSION_TIMEOUT = 3600000
+SESSION_UPDATE = 5000
 USER_SERVICE = <insert URL>
 QUESTION_SERVICE = <insert URL>
 ```
