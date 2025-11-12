@@ -53,13 +53,6 @@ steps:
       - --timeout=60
     waitFor: ['Push']
 
-availableSecrets:
-  secretManager:
-    - env: MONGO_URI_QUESTION_SERVICE
-      versionName: projects/cs3219-peerprep-g30/secrets/MONGO_URI_QUESTION_SERVICE/versions/latest
-    - env: USER_SERVICE_URL
-      versionName: projects/cs3219-peerprep-g30/secrets/USER_SERVICE_URL/versions/latest
-
 substitutions:
   _PR_NUMBER: ''
 
