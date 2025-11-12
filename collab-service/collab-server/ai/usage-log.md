@@ -20,4 +20,4 @@ Claude gave me steps on how to fix the bugs and code changes to make
 - [ ] Rejected
 
 # Author Notes:
-I had to change some parameters for how the MongoDB was doing its connection and also revert to a HTTP server
+I had to change some parameters for how the MongoDB was doing its connection and also revert to a HTTP server. Tested it by deploying on Google Cloud Run
