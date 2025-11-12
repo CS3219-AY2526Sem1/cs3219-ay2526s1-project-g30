@@ -1,28 +1,34 @@
+import { Suspense } from 'react'
 import { Toaster } from 'sonner'
 import { LayoutContentClient } from './LayoutContentClient'
+import { NavbarSkeleton } from './NavbarSkeleton'
 import { getUserProfile } from '@/app/actions/auth'
-import bgImage from '@/public/bg-rings.jpg'
 
-export async function LayoutContent({ children }: { children: React.ReactNode }) {
-  // Fetch user profile server-side to pass to Navbar
+async function UserLayout({ children }: { children: React.ReactNode }) {
   let userProfile = null
+
   try {
-    // Try to fetch user profile - will fail if not authenticated
     userProfile = await getUserProfile()
   } catch (error) {
-    // User not authenticated or error fetching profile - Navbar will be hidden
-    // This is expected for unauthenticated users
+    // Expected for unauthenticated users; Navbar will be hidden
   }
 
   return (
-    <div
-      className="relative h-screen flex flex-col bg-cover bg-no-repeat bg-center bg-fixed"
-      style={{ backgroundImage: `url(${bgImage.src})`, backgroundColor: 'hsl(var(--background))', backgroundSize: 'cover', backgroundAttachment: 'fixed' }}
-    >
-      <LayoutContentClient userProfile={userProfile}>
-        {children}
-      </LayoutContentClient>
+    <LayoutContentClient userProfile={userProfile}>
+      {children}
+    </LayoutContentClient>
+  )
+}
+
+export function LayoutContent({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <Suspense fallback={<NavbarSkeleton />}>
+        {/* UserLayout is async Server Component; streamed separately */}
+        {/* Wrapped in Suspense to allow streaming with Cache Components */}
+        <UserLayout>{children}</UserLayout>
+      </Suspense>
       <Toaster />
-    </div>
+    </>
   )
 }

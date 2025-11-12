@@ -108,6 +108,23 @@ export async function setupYJS({
       }
     );
 
+    let terminated = false;
+
+    const markTerminated = () => {
+      if (!terminated) terminated = true;
+    };
+
+    const safeOnSessionTerminated = () => {
+      if (terminated) return;
+      terminated = true;
+      if (onSessionTerminated) onSessionTerminated();
+    };
+
+    const safeOnError = (message: string) => {
+      if (terminated) return;
+      if (onError) onError(message);
+    };
+
     // Handle WebSocket close events for better error reporting
     if (provider.ws) {
       provider.ws.addEventListener('close', (event: any) => {
@@ -120,18 +137,15 @@ export async function setupYJS({
         // Handle different close codes as per collab service API
         switch (event.code) {
           case 1006:
-            // Code 1006 is expected during normal cleanup/disconnection
+            // Code 1006 can occur during normal cleanup; avoid noisy errors
             console.info('[YJS] Closed - Connection ended (code 1006)');
-            if (onError) {
-              onError('Connection to collaboration service failed. Please refresh the page.');
-            }
             break;
+
           case 3000:
             console.warn('[YJS] Session ended due to inactivity');
-            if (onSessionTerminated) {
-              onSessionTerminated();
-            }
+            safeOnSessionTerminated();
             break;
+
           case 4000:
             console.error('[YJS] Unexpected closure');
             if (onError) {
@@ -140,34 +154,29 @@ export async function setupYJS({
             break;
           case 4001:
             console.info('[YJS] Session ended by user or other client');
-            if (onSessionTerminated) {
-              onSessionTerminated();
-            }
+            safeOnSessionTerminated();
             break;
+
           case 4002:
             console.error('[YJS] Check-alive failed - connection lost');
-            if (onError) {
-              onError('Connection lost to collaboration service. Please refresh the page.');
-            }
+            safeOnError('Connection lost to collaboration service. Please refresh the page.');
             break;
+
           case 4003:
             console.error('[YJS] Known error occurred:', event.reason);
-            if (onError) {
-              onError(`Collaboration error: ${event.reason || 'Unknown error'}. Please try again.`);
-            }
+            safeOnError(`Collaboration error: ${event.reason || 'Unknown error'}. Please try again.`);
             break;
+
           case 4004:
             console.error('[YJS] Unknown error occurred');
-            if (onError) {
-              onError('An unknown error occurred in the collaboration service. Please refresh the page.');
-            }
+            safeOnError('An unknown error occurred in the collaboration service. Please refresh the page.');
             break;
+
           case 4005:
             console.error('[YJS] Connection not available');
-            if (onError) {
-              onError('Collaboration service is temporarily unavailable. Please try again later.');
-            }
+            safeOnError('Collaboration service is temporarily unavailable. Please try again later.');
             break;
+
           default:
             console.log('[YJS] WebSocket closed with code:', event.code);
         }
@@ -251,8 +260,12 @@ export async function setupYJS({
       console.log('[YJS] Connection status:', event.status);
     });
 
-    // Handle errors
+    // Handle errors (only when not already terminated)
     provider.on('connection-error', (event: Event) => {
+      if (terminated) {
+        console.log('[YJS] Ignoring connection-error after termination');
+        return;
+      }
       console.error('[YJS] Connection error:', event);
       if (onError) {
         onError('Failed to connect to collaboration service. Please check your connection and refresh the page.');
