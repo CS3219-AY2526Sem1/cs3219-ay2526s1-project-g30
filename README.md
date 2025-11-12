@@ -42,4 +42,4 @@ PeerPrep is an online learning platform designed to help new coders grow through
 
 
 ## AI Usage Documentation<a id='ai-usage-documentation'></a>
-Refer to  [`ai/`](./ai/) for a record of how AI was used in the development of PeerPrep for the different services.
+Refer to the [`ai/`](./ai/) folder for records of how AI was used in the development of PeerPrep for the different services.
