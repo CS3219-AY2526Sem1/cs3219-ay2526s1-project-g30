@@ -5,16 +5,13 @@
 // Made extensive changes to suit needs of PeerPrep
 
 // AI Assistance Disclosure:
-// Tool: Claude AI (Sonnet 4.5), date: 2025‑10-05
+// Tool: Claude AI (Sonnet 4.5), date: 2025‑10-25
 // Scope: Debugging errors and issues with connecting with Cloud Run
 // Author review: Validated correctness
 
 import dotenv from 'dotenv'
 import WebSocket from 'ws'
 import http from 'http'
-// import https from 'https'
-// import fs from 'fs'
-// import path from 'path'
 import os from 'os'
 import * as number from 'lib0/number.js'
 import { Session } from './session.js'
@@ -103,23 +100,7 @@ async function loadActiveSessions() {
 }
 
 // HTTP server setup
-// SSL/TLS options
-// const sslOptions = {
-//   key: process.env.KEY, //fs.readFileSync(path.join('key.pem')),
-//   cert: process.env.CERT, //fs.readFileSync(path.join('cert.pem')),
-//   // Recommended security settings
-//   secureOptions: constants.SSL_OP_NO_SSLv3 |
-//               constants.SSL_OP_NO_TLSv1 |
-//               constants.SSL_OP_NO_TLSv1_1
-// }
-
 const server = http.createServer(async (req, res) => {
-  // Security headers
-  // res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
-  // res.setHeader('X-Content-Type-Options', 'nosniff')
-  // res.setHeader('X-Frame-Options', 'SAMEORIGIN')
-  // res.setHeader('X-XSS-Protection', '1; mode=block')
-  // res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
 
   // Standard access to url
   if (req.url === '/') {
