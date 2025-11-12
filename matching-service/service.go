@@ -1,4 +1,10 @@
 // service.go
+// AI Assistance Disclosure:
+// Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-10, etc.
+// Scope: Implemented Mathcing Service (mainly `ProcessMatchRequest()`) prototype,
+// generated `CancelMatchRequest`, refactored other functions to a
+// more readable form and fixed URL encoding problem/waitingPool change.
+// Author review: Validated correctness, done re-refactor and tested.
 
 package main
 
@@ -62,7 +68,6 @@ func getQuestionFromService(difficulty string, topic string, user1ID string, use
 	parsedURL.RawQuery = params.Encode()
 
 	// 'finalURL' is now guaranteed to be correctly encoded
-	// (e.g., "...&topic=data+structures&...")
 	finalURL := parsedURL.String()
 
 	log.Info().Str("url", finalURL).Msg("Requesting question from Question Service...")

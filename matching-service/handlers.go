@@ -1,3 +1,9 @@
+// handlers.go
+// AI Assistance Disclosure:
+// Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-05
+// Scope: Implemented `createMatchHandler` and `createCancelHandler` prototype
+// and polished message strings.
+// Author review: Validated correctness and done test.
 package main
 
 import (
@@ -66,3 +72,4 @@ func createCancelHandler(service *MatchingService) gin.HandlerFunc {
 		}
 	}
 }
+
