@@ -22,8 +22,8 @@ PeerPrep is an online learning platform designed to help new coders grow through
 ### System Architecture
 | Service | Language | Framework | Database | Tools |
 | ------- | -------- | --------- | -------- | ----- |
-| User Service | Javascript | Node.js (Backend) | MongoDB Atlas | SendGrid (Email Verification) |
-|              |            | Express.js (API) |                |                               |
+| User Service | Javascript | Node.js (Backend)\nExpress.js (API) | MongoDB Atlas | SendGrid (Email Verification) |
+|              |            |  |                |                               |
 
 ## Pre-requisites<a id='pre-requisites'></a>
 
