@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT‑5 Thinking), date: 2025‑10-05
+// Scope: Generated implementation based on API requirements.
+// Author review: Validated correctness. Edited multiple times with evolving requirements and models.
+
 import axios from 'axios'
 import express from 'express';
 import Question from '../models/question.model.js';

@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT‑5 Thinking), date: 2025‑11-08
+// Scope: Generated implementation.
+// Author review: Validated correctness.
+
 import schedule from "node-schedule";
 import { recalcQuestionStats } from "./updateQuestionStats.js";
 

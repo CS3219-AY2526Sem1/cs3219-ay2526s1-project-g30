@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT‑5 Thinking), date: 2025‑11-10
+// Scope: Generated implementation of unit testing.
+// Author review: Validated and edited for correctness.
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // mock node-schedule and updateQuestionStats
