@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -23,6 +24,11 @@ func main() {
 	router := gin.Default()
 	router.POST("/api/v1/match", createMatchHandler(service))
 
-	log.Info().Msg("Matching service started successfully. Listening on localhost:8080...")
-	router.Run("localhost:8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Info().Msgf("Matching service started successfully. Listening on 0.0.0.0:%s...", port)
+	router.Run(fmt.Sprintf("0.0.0.0:%s", port))
 }

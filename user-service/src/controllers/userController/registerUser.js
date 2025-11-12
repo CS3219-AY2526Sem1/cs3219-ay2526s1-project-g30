@@ -1,5 +1,4 @@
 const User = require('../../models/User');
-const crypto = require('crypto');
 const sendEmail = require('../../utils/sendEmail');
 
 const registerUser = async (req, res) => {
@@ -20,33 +19,32 @@ const registerUser = async (req, res) => {
       profilePictureUrl: defaultProfilePic,
     });
 
-    const verificationToken = crypto.randomBytes(20).toString('hex');
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); 
 
-    user.emailVerificationToken = crypto
-      .createHash('sha256')
-      .update(verificationToken)
-      .digest('hex');
-    
-    user.emailVerificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
-    
-    await user.save({ validateBeforeSave: false });
+    user.emailVerificationOtp = otp;
+    user.emailVerificationOtpExpires = Date.now() + 15 * 60 * 1000; 
 
-    const verificationUrl = `${req.protocol}://${req.get('host')}/api/users/verify-email/${verificationToken}`;
-    const message = `Welcome to PeerPrep! Please click the following link to verify your email address. This link is valid for 24 hours.\n\n${verificationUrl}`;
-    
+    await user.save({ validateBeforeSave: false }); 
+
+    const message = `Welcome to PeerPrep! Your verification code is: ${otp}\n\nThis code is valid for 15 minutes. Please enter it in the application to verify your email address.`;
+
     await sendEmail({
       email: user.email,
-      subject: 'Verify Your PeerPrep Email Address',
+      subject: 'Your PeerPrep Email Verification Code',
       message,
     });
 
     res.status(201).json({
-      message: 'Registration successful! Please check your email to verify your account.'
+      message: 'Registration successful! Please check your email for your verification code.',
+      userId: user._id
     });
 
   } catch (err) {
     console.error(err);
-    res.status(500).send('Server Error');
+    if (user && !user.isEmailVerified) {
+        // Attempt to clean up user if email sending failed maybe? Or leave for cleanup job.
+    }
+    res.status(500).send('Server Error during registration.');
   }
 };
 
