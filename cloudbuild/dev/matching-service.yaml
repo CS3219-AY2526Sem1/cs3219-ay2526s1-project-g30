@@ -54,7 +54,7 @@ steps:
       - -c
       - |
         source urls.env
-         gcloud run deploy matching-service-dev \
+        gcloud run deploy matching-service-dev \
            --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-dev/matching-service:$SHORT_SHA \
            --region=asia-southeast1 \
            --platform=managed \

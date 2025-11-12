@@ -3,6 +3,30 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 steps:
+  # Pull the latest staging image
+  - name: gcr.io/cloud-builders/docker
+    id: Pull-Staging
+    args:
+      - pull
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/matching-service:latest
+
+  # Re-tag to production repository
+  - name: gcr.io/cloud-builders/docker
+    id: Tag-Production
+    args:
+      - tag
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/matching-service:latest
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/matching-service:latest
+    waitFor: ['Pull-Staging']
+
+  # Push to production repository
+  - name: gcr.io/cloud-builders/docker
+    id: Push-Production
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/matching-service:latest
+    waitFor: ['Tag-Production']
+
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Resolve-URLs
     entrypoint: bash
@@ -13,6 +37,7 @@ steps:
          QN_URL=$(gcloud run services describe question-service-production --region=asia-southeast1 --format='value(status.url)')
          echo "COLLAB_SERVICE_URL=$$COLLAB_URL" >> urls.env
          echo "QUESTION_SERVICE_URL=$$QN_URL" >> urls.env
+    waitFor: ['Push-Production']
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     id: Deploy
@@ -22,7 +47,7 @@ steps:
       - |
         source urls.env
         gcloud run deploy matching-service-production \
-          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/matching-service:latest \
+          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/matching-service:latest \
           --region=asia-southeast1 \
           --platform=managed \
           --allow-unauthenticated \
@@ -34,6 +59,9 @@ steps:
           --max-instances=100 \
           --timeout=60
     waitFor: ['Resolve-URLs']
+
+images:
+  - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/matching-service:latest
 
 tags:
   - production
