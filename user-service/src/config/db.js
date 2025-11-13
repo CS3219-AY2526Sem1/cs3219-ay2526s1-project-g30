@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-10-09
+// Scope: Generated implementation based on database connection requirements.
+// Author review: Validated correctness.
+
 const mongoose = require('mongoose');
 require('dotenv').config();
 
@@ -6,9 +11,8 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGO_URI, {
   serverSelectionTimeoutMS: 5000,
   connectTimeoutMS: 10000,
-  // CRITICAL: Add these TLS options
   tls: true,
-  tlsAllowInvalidCertificates: true, // Needed for Cloud Run
+  tlsAllowInvalidCertificates: true, 
   retryWrites: true,
   retryReads: true,
 });

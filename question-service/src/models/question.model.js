@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT‑5 Thinking), date: 2025‑10-05
+// Scope: Generated implementation based on provided Question database design.
+// Author review: Validated correctness. Edited multiple times with evolving requirements and models.
+
 import mongoose from 'mongoose';
 
     const ReturnTypeSchema = new mongoose.Schema({

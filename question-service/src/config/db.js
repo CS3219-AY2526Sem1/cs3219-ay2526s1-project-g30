@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT‑5 Thinking), date: 2025‑10-05
+// Scope: Generated implementation.
+// Author review: Validated correctness.
+
 import mongoose from 'mongoose';
 
 const connectDB = async () => {

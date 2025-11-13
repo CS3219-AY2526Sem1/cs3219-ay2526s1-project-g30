@@ -1,10 +1,14 @@
+// AI Assistance Disclosure:
+// Tool: Google Gemini AI (Model: PRO) date: 2025-10-18
+// Scope: Generated implementation based on my API requirements.
+// Author review: Validated correctness.
+
 const User = require('../../models/User'); 
 const bcrypt = require('bcryptjs');
 
 const changePassword = async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
-  // New password cannot be the same as current
   if (currentPassword === newPassword) {
     return res.status(400).json({ message: 'New password cannot be the same as the current password.' });
   }

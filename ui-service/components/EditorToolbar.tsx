@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (model: Claude Haiku 4.5 & Claude Sonnet 4.5), date: 2025‑11-1
+// Scope: Generated implementation based on component specifications.
+// Author review: Validated correctness, fixed bugs
+
 'use client'
 
 import { useCallback } from 'react'
@@ -28,16 +33,20 @@ import {
   ClipboardPaste,
   AArrowDown,
   AArrowUp,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react'
 
 interface EditorToolbarProps {
   isEditorOnLeft: boolean
   onSwapPanels: () => void
-  isVerticalSplit: boolean
+  isHorizontalSplit: boolean
   onToggleSplitDirection: () => void
   textSize: number
   onTextSizeChange: (size: number) => void
   editorInstance?: any
+  isChatVisible?: boolean
+  onToggleChatVisibility?: () => void
 }
 
 const TEXT_SIZE_PRESETS = [10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
@@ -45,11 +54,13 @@ const TEXT_SIZE_PRESETS = [10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
 export function EditorToolbar({
   isEditorOnLeft,
   onSwapPanels,
-  isVerticalSplit,
+  isHorizontalSplit,
   onToggleSplitDirection,
   textSize,
   onTextSizeChange,
   editorInstance,
+  isChatVisible = true,
+  onToggleChatVisibility,
 }: EditorToolbarProps) {
   const handleTextSizeDecrease = useCallback(() => {
     const currentIndex = TEXT_SIZE_PRESETS.indexOf(textSize)
@@ -145,6 +156,7 @@ export function EditorToolbar({
   return (
     <TooltipProvider>
       <div className="flex items-center justify-start bg-background border-b border-border px-4 py-3 gap-4">
+        <div className="flex items-center gap-4 flex-1">
         {/* Edit controls */}
         <div className="flex items-center gap-2">
           {/* Undo button */}
@@ -181,9 +193,7 @@ export function EditorToolbar({
             </TooltipContent>
           </Tooltip>
 
-          <Separator orientation="vertical" className="h-5" />
-
-          {/* Copy button */}
+          <Separator orientation="vertical" className="h-5 w-0.5" />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -237,7 +247,7 @@ export function EditorToolbar({
           <Separator orientation="vertical" className="h-5" />
         </div>
 
-        <Separator orientation="vertical" className="h-5" />
+        <Separator orientation="vertical" />
 
         {/* Layout controls */}
         <div className="flex items-center gap-2">
@@ -267,13 +277,13 @@ export function EditorToolbar({
                 size="sm"
                 onClick={onToggleSplitDirection}
               >
-                {isVerticalSplit ? <Columns2 /> : <Rows2 />}
+                {isHorizontalSplit ? <Columns2 /> : <Rows2 />}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              {isVerticalSplit
-                ? 'Switch to horizontal split'
-                : 'Switch to vertical split'}
+              {isHorizontalSplit
+                ? 'Switch to vertical split'
+                : 'Switch to horizontal split'}
             </TooltipContent>
           </Tooltip>
 
@@ -329,6 +339,26 @@ export function EditorToolbar({
             </TooltipContent>
           </Tooltip>
         </div>
+        </div>
+
+        {/* Hide/Show chat button - right aligned */}
+        {onToggleChatVisibility && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleChatVisibility}
+                aria-label={isChatVisible ? 'Hide chat panel' : 'Show chat panel'}
+              >
+                {isChatVisible ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {isChatVisible ? 'Hide chat panel' : 'Show chat panel'}
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </TooltipProvider>
   )

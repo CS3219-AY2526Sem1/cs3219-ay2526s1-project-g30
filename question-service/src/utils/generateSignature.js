@@ -1,4 +1,8 @@
-// utils/generateSignature.js
+// AI Assistance Disclosure:
+// Tool: ChatGPT (model: GPT‑5 Thinking), date: 2025‑10-25
+// Scope: Generated implementation based on API requirements.
+// Author review: Validated correctness. Edited to fix bugs.
+
 export function generateFunctionTemplate(question, lang) {
     const { function_name, function_params, function_return } = question;
 

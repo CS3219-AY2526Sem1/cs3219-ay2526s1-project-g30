@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (Claude 4.5 Haiku), date: 2025‑11-1
+// Scope: Generated implementation based on API requirements.
+// Author review: Validated correctness, fixed bugs
+
 /**
  * Authentication Proxy
  *
@@ -108,11 +113,12 @@ export async function proxy(request: NextRequest) {
   }
 
   // If user is authenticated and trying to access an auth route
-  // Allow them to stay on /login (they might be in the middle of signup/profile setup)
-  // The login page component will handle redirects as needed
-  if (isAuthRoute(pathname) && isAuthenticated && pathname !== '/login') {
-    // Redirect to home page
-    return NextResponse.redirect(new URL('/home', request.nextUrl.origin));
+  if (isAuthRoute(pathname) && isAuthenticated) {
+    // Only redirect if profile setup is complete
+    if (session?.profileComplete) {
+      return NextResponse.redirect(new URL('/home', request.nextUrl.origin));
+    }
+    // Allow users with incomplete profiles to continue signup flow on /login
   }
 
   return NextResponse.next();

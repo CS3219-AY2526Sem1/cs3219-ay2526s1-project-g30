@@ -1,4 +1,11 @@
 // service.go
+// AI Assistance Disclosure:
+// Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-10, etc.
+// Scope: Implemented Matching Service (mainly `ProcessMatchRequest()`) prototype,
+// Implemented `informCollaborationService` (almost same as `getQuestionFromService`)
+// fixed URL encoding problem/waitingPool change based on my ideas and designation.
+// refactored other functions to a more readable form
+// Author review: Validated correctness, done re-refactor and tested.
 
 package main
 
@@ -19,6 +26,7 @@ import (
 type MatchingService struct {
 	mutex       sync.Mutex
 	waitingPool map[string][]*WaitingUser // CHANGED: value is now a slice of pointers
+	userIndex   map[string]*WaitingUser
 	matcher     Matcher
 }
 
@@ -26,6 +34,7 @@ type MatchingService struct {
 func NewMatchingService(matcher Matcher) *MatchingService {
 	return &MatchingService{
 		waitingPool: make(map[string][]*WaitingUser),
+		userIndex:   make(map[string]*WaitingUser),
 		matcher:     matcher,
 	}
 }
@@ -46,21 +55,18 @@ func getQuestionFromService(difficulty string, topic string, user1ID string, use
 		return "", err
 	}
 
-	// 3. Set the path for the specific endpoint
-	parsedURL.Path = "/questions/randomQuestion" // Or whatever the correct path is
+	parsedURL.Path = "/questions/randomQuestion"
 
-	// 4. Create a new set of query parameters
 	params := url.Values{}
 	params.Add("difficulty", difficulty)
-	params.Add("category", topic) // url.Values.Add() will automatically encode this!
+	params.Add("category", topic)
 	params.Add("user1", user1ID)
 	params.Add("user2", user2ID)
 
-	// 5. Encode the parameters and add them to the URL
+	// Encode the parameters and add them to the URL
 	parsedURL.RawQuery = params.Encode()
 
 	// 'finalURL' is now guaranteed to be correctly encoded
-	// (e.g., "...&topic=data+structures&...")
 	finalURL := parsedURL.String()
 
 	log.Info().Str("url", finalURL).Msg("Requesting question from Question Service...")
@@ -117,6 +123,37 @@ func informCollaborationService(payload CollaborationRequest) error {
 	return nil
 }
 
+func (s *MatchingService) CancelMatchRequest(userID string) bool {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	user, found := s.userIndex[userID]
+	if !found {
+		log.Warn().Str("userId", userID).Msg("User tried to cancel, but was not in the pool.")
+		return false
+	}
+
+	delete(s.userIndex, userID)
+
+	key := createMatchKey(user.Info.Difficulty, user.Info.Topic)
+	if users, found := s.waitingPool[key]; found {
+		for i, u := range users {
+			if u.Info.UserID == userID {
+				s.waitingPool[key][i] = s.waitingPool[key][len(users)-1]
+				s.waitingPool[key] = s.waitingPool[key][:len(users)-1]
+
+				log.Info().Str("userId", userID).Str("key", key).Msg("User successfully canceled and removed from pool.")
+
+				user.NotifyChan <- MatchResult{} // NOTE: will cause 408
+				return true
+			}
+		}
+	}
+
+	log.Error().Str("userId", userID).Msg("CRITICAL: User was in userIndex but not in waitingPool. State was inconsistent.")
+	return false
+}
+
 func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult {
 	resultChan := make(chan MatchResult, 1)
 
@@ -141,6 +178,7 @@ func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult
 					break
 				}
 			}
+			delete(s.userIndex, opponent.Info.UserID)
 			s.mutex.Unlock()
 
 			questionID, err := getQuestionFromService(req.Difficulty, req.Topic, req.UserID, opponent.Info.UserID)
@@ -182,6 +220,7 @@ func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult
 		// If no match was found, add the current user to the waiting slice.
 		log.Info().Str("userId", newUser.Info.UserID).Str("key", key).Msg("User added to the waiting pool")
 		s.waitingPool[key] = append(s.waitingPool[key], newUser)
+		s.userIndex[newUser.Info.UserID] = newUser
 		s.mutex.Unlock()
 
 		select {
@@ -190,12 +229,13 @@ func (s *MatchingService) ProcessMatchRequest(req MatchRequest) chan MatchResult
 			return
 		case <-time.After(30 * time.Second):
 			s.mutex.Lock()
-			key_timeout := req.Difficulty + "-" + req.Topic
+			key_timeout := createMatchKey(req.Difficulty, req.Topic)
 
 			if users, found := s.waitingPool[key_timeout]; found {
 				for i, user := range users {
 					if user.Info.UserID == req.UserID {
 						s.waitingPool[key_timeout] = append(users[:i], users[i+1:]...)
+						delete(s.userIndex, req.UserID)
 						log.Info().Str("userId", req.UserID).Msg("User timed out and was removed from the pool.")
 						resultChan <- MatchResult{}
 						break

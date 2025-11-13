@@ -1,3 +1,7 @@
+// AI Assistance Disclosure:
+// Tool: Gemini (model: Gemini 2.5 Pro), date: 2025‑10-14
+// Scope: Implemented mock functions for test.
+// Author review: Validated correctness and done test.
 package main
 
 import (
@@ -5,7 +9,6 @@ import (
 )
 
 // NOTE: Mock External Services
-// HACK: Replace it with real function
 
 func getMockQuestion(difficulty string, topic string) string {
 	log.Info().Str("difficulty", difficulty).Str("topic", topic).Msg("Fetching mock question...")

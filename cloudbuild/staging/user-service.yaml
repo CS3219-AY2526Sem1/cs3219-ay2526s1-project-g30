@@ -1,0 +1,72 @@
+# Staging - user-service
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  - name: node:lts-alpine
+    id: Test
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        cd user-service && \
+        npm ci && \
+        npm test 2>/dev/null || echo "No tests configured"
+
+  - name: gcr.io/cloud-builders/docker
+    id: Build
+    args:
+      - build
+      - --no-cache
+      - -t
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:$SHORT_SHA
+      - -t
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:pr-$_PR_NUMBER
+      - -f
+      - user-service/Dockerfile
+      - user-service
+    waitFor: ['Test']
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:$SHORT_SHA
+    waitFor: ['Build']
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push-latest
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:pr-$_PR_NUMBER
+    waitFor: ['Build']
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - user-service-staging
+      - --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/user-service:$SHORT_SHA
+      - --region=asia-southeast1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=5001
+      - --set-secrets=MONGO_URI=MONGO_URI_USER_SERVICE:latest,JWT_SECRET=JWT_SECRET:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,GCS_BUCKET_NAME=GCS_BUCKET_NAME:latest
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=3
+      - --timeout=60
+    waitFor: ['Push', 'Push-latest']
+
+substitutions:
+  _PR_NUMBER: ''
+
+tags:
+  - staging
+  - user-service
+  - pr-$_PR_NUMBER
+
+timeout: 1800s

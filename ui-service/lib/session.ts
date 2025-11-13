@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (Claude 4.5 Haiku), date: 2025‑11-1
+// Scope: Generated implementation based on API requirements.
+// Author review: Validated correctness, fixed bugs
+
 /**
  * Session management module for secure authentication.
  *
@@ -17,6 +22,7 @@ export interface SessionPayload extends JWTPayload {
   username: string;
   token?: string;
   expiresAt: string | Date;
+  profileComplete?: boolean;
 }
 
 const encodedKey = new TextEncoder().encode(config.session.secret);
@@ -58,12 +64,15 @@ export async function decryptSession(
  * @param userId The user ID for the session
  * @param email The user's email
  * @param username The user's username
+ * @param token Optional authentication token
+ * @param profileComplete Whether the user has completed their profile setup
  */
 export async function createSession(
   userId: string,
   email: string,
   username: string,
-  token?: string
+  token?: string,
+  profileComplete: boolean = false
 ): Promise<void> {
   const expiresAt = new Date(
     Date.now() + config.session.expiresInDays * 24 * 60 * 60 * 1000
@@ -75,6 +84,7 @@ export async function createSession(
     username,
     token,
     expiresAt,
+    profileComplete,
   };
 
   const encrypted = await encryptSession(payload);
@@ -186,3 +196,47 @@ export async function generateAuthToken(
     .sign(jwtKey);
 }
 
+/**
+ * Marks the user's profile as complete in the session.
+ *
+ * Updates the profileComplete flag to true, indicating the user has finished
+ * their initial profile setup after registration.
+ *
+ * @returns The updated session payload, or null if no valid session exists
+ */
+export async function markProfileComplete(): Promise<SessionPayload | null> {
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get(config.session.cookieName);
+
+  if (!sessionCookie || !sessionCookie.value) {
+    return null;
+  }
+
+  const payload = await decryptSession(sessionCookie.value);
+
+  if (!payload) {
+    return null;
+  }
+
+  const expiresAt = new Date(
+    Date.now() + config.session.expiresInDays * 24 * 60 * 60 * 1000
+  );
+
+  const newPayload: SessionPayload = {
+    ...payload,
+    expiresAt,
+    profileComplete: true,
+  };
+
+  const encrypted = await encryptSession(newPayload);
+
+  cookieStore.set(config.session.cookieName, encrypted, {
+    httpOnly: true,
+    secure: config.isProduction,
+    sameSite: 'lax',
+    maxAge: config.session.expiresInDays * 24 * 60 * 60,
+    path: '/',
+  });
+
+  return newPayload;
+}

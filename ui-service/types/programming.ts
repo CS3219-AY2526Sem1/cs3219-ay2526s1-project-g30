@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (Claude 4.5 Haiku), date: 2025‑10-26
+// Scope: Generated implementation based on API requirements.
+// Author review: Validated correctness, fixed bugs
+
 export type ProgrammingLanguage = "java" | "python" | "cpp";
 
 export interface ProgrammingLanguageConfig {

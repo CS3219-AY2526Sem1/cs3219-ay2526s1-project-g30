@@ -1,16 +1,24 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (model: Claude Haiku 4.5 & Claude Sonnet 4.5), date: 2025‑10-26
+// Scope: Generated implementation based on specifications and API requirements.
+// Author review: Validated correctness, fixed bugs
+
 'use client';
 
-import { useActionState, useEffect, useTransition } from 'react';
+import { useActionState, useEffect, useTransition, useState } from 'react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { ViewContent } from '@/components/ViewContent';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
-import { Field, FieldContent, FieldLabel, FieldError, FieldGroup } from '@/components/ui/field';
+import { ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { Field, FieldContent, FieldLabel, FieldError, FieldDescription, FieldGroup } from '@/components/ui/field';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Spinner } from '@/components/ui/spinner';
 import { validateUsername, validateEmail, validatePassword } from '@/lib/validation';
+import { useDebounceValue } from '@/hooks/use-debounce-value';
 import { signUp } from '@/app/actions/auth';
+import { checkUsernameAvailability } from '@/app/actions/checkUsername';
 
 interface SignupViewProps {
   isActive: boolean;
@@ -44,6 +52,13 @@ export function SignupView({
   const [state, formAction, isSigningUp] = useActionState(signUp, undefined);
   const [, startTransition] = useTransition();
 
+  // Debounce username for availability check
+  const [debouncedUsername] = useDebounceValue(usernameInput, 500);
+
+  const [usernameError, setUsernameError] = useState<string>();
+  const [usernameIsChecking, setUsernameIsChecking] = useState(false);
+  const [usernameIsAvailable, setUsernameIsAvailable] = useState<boolean>();
+
   // Watch for successful signup and trigger callback
   useEffect(() => {
     if (state?.success) {
@@ -61,6 +76,48 @@ export function SignupView({
     if (!usernameInput) return { isValid: true };
     return validateUsername(usernameInput);
   }, [usernameInput]);
+
+  // Track if username is currently being edited (different from debounced value)
+  const isUsernameBeingEdited = usernameInput !== debouncedUsername;
+
+  // Clear/prepare availability state when user is actively typing
+  useEffect(() => {
+    if (isUsernameBeingEdited) {
+      setUsernameIsAvailable(undefined);
+      setUsernameError(undefined);
+      setUsernameIsChecking(true);
+    }
+  }, [isUsernameBeingEdited]);
+
+  // Check username availability only when debounce settles and user stops typing
+  useEffect(() => {
+    // Don't check if user is still typing
+    if (isUsernameBeingEdited) {
+      return;
+    }
+
+    // Clear state if format is invalid or username is empty
+    if (!usernameFormatValidation.isValid || !debouncedUsername) {
+      setUsernameIsAvailable(undefined);
+      setUsernameError(usernameFormatValidation.errorMessage);
+      setUsernameIsChecking(false);
+      return;
+    }
+
+    // Check availability
+    const checkAvailability = async () => {
+      setUsernameIsChecking(true);
+      try {
+        const result = await checkUsernameAvailability(debouncedUsername);
+        setUsernameIsAvailable(result.isAvailable);
+        setUsernameError(result.errorMessage);
+      } finally {
+        setUsernameIsChecking(false);
+      }
+    };
+
+    checkAvailability();
+  }, [debouncedUsername, usernameFormatValidation, isUsernameBeingEdited]);
 
   // Validate email
   const emailValidation = useMemo(() => {
@@ -88,6 +145,7 @@ export function SignupView({
     return (
       usernameInput &&
       usernameFormatValidation.isValid &&
+      usernameIsAvailable === true &&
       emailInput &&
       emailValidation.isValid &&
       passwordInput &&
@@ -98,6 +156,7 @@ export function SignupView({
   }, [
     usernameInput,
     usernameFormatValidation.isValid,
+    usernameIsAvailable,
     emailInput,
     emailValidation.isValid,
     passwordInput,
@@ -145,7 +204,8 @@ export function SignupView({
         
         <Field
           data-invalid={
-            (usernameInput && !usernameFormatValidation.isValid)
+            (usernameInput && !usernameFormatValidation.isValid && !usernameIsChecking) ||
+            (usernameInput && !usernameIsChecking && usernameError)
               ? true
               : undefined
           }
@@ -154,20 +214,39 @@ export function SignupView({
             Username
           </FieldLabel>
           <FieldContent>
-            <Input
-              id="signup-username"
-              type="text"
-              placeholder="your.username"
-              value={usernameInput}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => onUsernameChange(e.target.value)}
-              aria-invalid={
-                (usernameInput && !usernameFormatValidation.isValid)
-                  ? 'true'
-                  : 'false'
-              }
-            />
-            {usernameInput && !usernameFormatValidation.isValid && (
-              <FieldError>{usernameFormatValidation.errorMessage || 'Invalid username'}</FieldError>
+            <InputGroup>
+              <InputGroupInput
+                id="signup-username"
+                type="text"
+                placeholder="jane.smith"
+                value={usernameInput}
+                onChange={(e) => onUsernameChange(e.target.value)}
+                aria-invalid={
+                  (usernameInput && !usernameFormatValidation.isValid && !usernameIsChecking) ||
+                  (usernameInput && !usernameIsChecking && usernameError)
+                    ? 'true'
+                    : 'false'
+                }
+              />
+              {usernameIsChecking && (
+                <InputGroupAddon align="inline-end">
+                  <Spinner className="size-4" />
+                </InputGroupAddon>
+              )}
+              {usernameIsAvailable === true && !usernameIsChecking && (
+                <InputGroupAddon align="inline-end">
+                  <Check className="size-4 text-green-600" />
+                </InputGroupAddon>
+              )}
+            </InputGroup>
+            {usernameInput && usernameIsChecking && (
+              <FieldDescription>Checking availability...</FieldDescription>
+            )}
+            {usernameIsAvailable === true && !usernameIsChecking && (
+              <FieldDescription className="text-green-600">Username is available</FieldDescription>
+            )}
+            {usernameInput && !usernameIsChecking && usernameError && (
+              <FieldError>{usernameError}</FieldError>
             )}
           </FieldContent>
         </Field>

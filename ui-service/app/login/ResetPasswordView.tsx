@@ -1,18 +1,25 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (model: Claude Haiku 4.5 & Claude Sonnet 4.5), date: 2025‑10-26
+// Scope: Generated implementation based on specifications and API requirements.
+// Author review: Validated correctness, fixed bugs
+
 'use client';
 
 import { useActionState, useTransition } from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { PasswordInput } from '@/components/ui/password-input';
 import { ViewContent } from '@/components/ViewContent';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Info, TriangleAlert } from 'lucide-react';
 import { Field, FieldContent, FieldLabel, FieldError, FieldGroup } from '@/components/ui/field';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCountdown } from '@/hooks/use-countdown';
+import { useTimeout } from '@/hooks/use-timeout';
 import { Spinner } from '@/components/ui/spinner';
 import { validatePassword } from '@/lib/validation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { resetPassword, requestPasswordReset } from '@/app/actions/auth';
+import { resetPassword, resendPasswordResetOtp } from '@/app/actions/auth';
 
 interface ResetPasswordViewProps {
   isActive: boolean;
@@ -28,13 +35,14 @@ export function ResetPasswordView({
   onBack,
 }: ResetPasswordViewProps) {
   const [resetState, resetFormAction, isResettingPassword] = useActionState(resetPassword, undefined);
-  const [resendState, resendFormAction, isResendingOtp] = useActionState(requestPasswordReset, undefined);
+  const [resendState, resendFormAction] = useActionState(resendPasswordResetOtp, undefined);
   const [, startTransition] = useTransition();
   
   const [otpValue, setOtpValue] = useState<string>('');
   const [newPasswordInput, setNewPasswordInput] = useState<string>('');
   const [confirmPasswordInput, setConfirmPasswordInput] = useState<string>('');
   const [resetError, setResetError] = useState<string>();
+  const [isResendingOtp, setIsResendingOtp] = useState(false);
 
   // Countdown for resend OTP button (60 seconds)
   const [secondsRemaining, { startCountdown, resetCountdown }] = useCountdown({
@@ -51,6 +59,16 @@ export function ResetPasswordView({
     startCountdown();
   }, [startCountdown]);
 
+  // State for resend alert feedback
+  const [resendAlert, setResendAlert] = useState<'success' | 'error' | null>(null);
+  const resendStateTrackerRef = useRef<string | null>(null);
+
+  // Auto-dismiss alert after 10 seconds
+  useTimeout(
+    () => setResendAlert(null),
+    resendAlert ? 10000 : null
+  );
+
   // Handle successful password reset
   useEffect(() => {
     if (resetState?.success) {
@@ -64,6 +82,40 @@ export function ResetPasswordView({
       resetCountdown();
     }
   }, [resendState?.success, resetCountdown]);
+
+  // Track resend state changes and show alert (using ref to avoid cascading renders)
+  useEffect(() => {
+    if (!resendState) return;
+
+    const stateKey = `${resendState.success}-${resendState.message}`;
+    if (resendStateTrackerRef.current === stateKey) {
+      return; // Already shown this state
+    }
+
+    resendStateTrackerRef.current = stateKey;
+
+    const showAlert = () => {
+      if (resendState.success) {
+        setResendAlert('success');
+      } else if (!resendState.success) {
+        setResendAlert('error');
+      }
+    };
+
+    showAlert();
+  }, [resendState]);
+
+  // Reset isResendingOtp after resend action completes and restart countdown
+  useTimeout(
+    () => {
+      if (isResendingOtp && resendState) {
+        setIsResendingOtp(false);
+        resetCountdown();
+        startCountdown();
+      }
+    },
+    isResendingOtp && resendState ? 0 : null
+  );
 
   // Validate new password
   const newPasswordValidation = useMemo(() => {
@@ -94,14 +146,13 @@ export function ResetPasswordView({
   const handleResetPassword = async () => {
     if (!isFormValid) return;
 
-    setResetError(undefined);
-
     const formData = new FormData();
     formData.set('email', email);
     formData.set('otp', otpValue);
-    formData.set('password', newPasswordInput);
+    formData.set('newPassword', newPasswordInput);
 
     startTransition(() => {
+      setResetError(undefined);
       resetFormAction(formData);
     });
   };
@@ -109,13 +160,13 @@ export function ResetPasswordView({
   const handleResendOtp = async () => {
     if (!canResendOtp || isResendingOtp) return;
 
-    setResetError(undefined);
-    setOtpValue('');
-
     const formData = new FormData();
     formData.set('email', email);
 
     startTransition(() => {
+      setIsResendingOtp(true);
+      setResetError(undefined);
+      setOtpValue('');
       resendFormAction(formData);
     });
   };
@@ -249,6 +300,39 @@ export function ResetPasswordView({
           <ArrowLeft /> Back
         </Button>
       </div>
+
+      <AnimatePresence>
+        {resendAlert === 'success' && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Alert>
+              <Info />
+              <AlertDescription>
+                Verification code has been resent to your email.
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+        {resendAlert === 'error' && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <Alert variant="destructive">
+              <TriangleAlert />
+              <AlertDescription>
+                Failed to resend the verification code. Please try again.
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <p className="text-sm text-center text-muted-foreground">
         {canResendOtp ? (
