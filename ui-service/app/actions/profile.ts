@@ -14,6 +14,7 @@
 
 import { revalidatePath, updateTag } from 'next/cache';
 import * as userProfileManager from '@/lib/userProfileManager';
+import { deleteSession } from '@/lib/session';
 import type { UserProfile, ProfileUpdatePayload } from '@/lib/userProfileManager';
 import {
   logServerActionStart,
@@ -400,6 +401,10 @@ export async function deleteAccount(): Promise<{ success: boolean; message: stri
     });
 
     logTiming('deleteAccount', durationMilliseconds);
+    
+    // Delete the session cookie to log the user out
+    await deleteSession();
+
     logServerActionSuccess('deleteAccount');
 
     return { success: true, message: 'Account deleted successfully' };
