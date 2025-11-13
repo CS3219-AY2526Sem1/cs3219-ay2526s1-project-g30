@@ -1,15 +1,10 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (model: Claude Haiku 4.5 & Claude Sonnet 4.5), date: 2025‑10-26
+// Scope: Generated implementation based on specifications and API requirements.
+// Author review: Validated correctness, fixed bugs
+
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { AnimatePresence, motion } from 'framer-motion';
-import { EmailEntryView } from './EmailEntryView';
-import { PasswordAuthView } from './PasswordAuthView';
-import { SignupView } from './SignupView';
-import { OtpVerificationView } from './OtpVerificationView';
-import { SignupCompleteView } from './SignupCompleteView';
-import { ResetPasswordView } from './ResetPasswordView';
-import { requestPasswordReset } from '@/app/actions/auth';
 import { Suspense } from 'react';
 import { LoginContent } from './LoginContent';
 

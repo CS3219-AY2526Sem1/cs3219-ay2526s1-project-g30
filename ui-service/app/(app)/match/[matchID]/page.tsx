@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (model: Claude Haiku 4.5 & Claude Sonnet 4.5), date: 2025‑10-31
+// Scope: Generated implementation based on API requirements and component specifications.
+// Author review: Validated correctness, fixed bugs
+
 'use client'
 
 import { useState, useCallback, useRef } from 'react'

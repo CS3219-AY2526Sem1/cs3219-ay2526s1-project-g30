@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: sst/opencode (model: Polaris Alpha), date: 2025‑11-11
+// Scope: Generated implementation based on test specifications
+// Author review: Validated correctness, fixed bugs
+
 import { describe, it, expect } from 'vitest';
 import { validateEmail, validateUsername, validatePassword } from '../validation';
 

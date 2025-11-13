@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: sst/opencode (model: Polaris Alpha), date: 2025‑11-12
+// Scope: Generated implementation based on component specifications for PPR and existing code structure
+// Author review: Validated correctness, fixed bugs
+
 import { getUserProfile, UserServiceError } from '@/lib/userServiceClient';
 import { NextRequest, NextResponse } from 'next/server';
 

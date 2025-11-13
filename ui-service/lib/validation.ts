@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (Claude 4.5 Haiku), date: 2025‑10-26
+// Scope: Generated implementation based on specifications
+// Author review: Validated correctness, fixed bugs
+
 /**
  * Email validation following RFC 5322 specification.
  * Uses a reasonable regex pattern for practical email validation.

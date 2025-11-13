@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (Claude 4.5 Haiku), date: 2025‑11-1
+// Scope: Generated implementation based on API requirements.
+// Author review: Validated correctness, fixed bugs
+
 /**
  * User Service Client
  *
