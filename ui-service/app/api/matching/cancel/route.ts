@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: Zed (model: Claude 4.5 Sonnet), date: 2025‑11-1
+// Scope: Generated implementation based on specifications and existing code structure
+// Author review: Validated correctness, fixed bugs
+
 import { requireAuth } from '@/lib/dal';
 import { cancelMatchRequest, MatchingServiceError } from '@/lib/matchingServiceClient';
 import {

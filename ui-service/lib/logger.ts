@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: sst/opencode (Polaris Alpha), date: 2025‑11-11
+// Scope: Generated implementation based on requirements.
+// Author review: Validated correctness, fixed bugs
+
 /**
  * Centralised logging utility for server actions and API communication.
  *

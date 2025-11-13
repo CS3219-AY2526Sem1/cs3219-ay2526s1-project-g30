@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (model: Claude Haiku 4.5 & Claude Sonnet 4.5), date: 2025‑11-11
+// Scope: Generated implementation based on requirements.
+// Author review: Validated correctness, fixed bugs
+
 'use server';
 
 import { checkUsername } from '@/lib/userServiceClient';

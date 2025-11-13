@@ -1,3 +1,9 @@
+// AI Assistance Disclosure:
+// Tool: sst/opencode (model: Claude 4.5 Sonnet), date: 2025‑11-1
+// Scope: Generated implementation based on specifications for PPR and existing code structure
+// Author review: Validated correctness, fixed bugs
+
+
 /**
  * User profile cache for fetching avatars and other profile data.
  * Caches profiles to avoid repeated API calls for the same users.

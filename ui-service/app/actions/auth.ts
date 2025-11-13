@@ -1,3 +1,8 @@
+// AI Assistance Disclosure:
+// Tool: GitHub Copilot (model: Claude Haiku 4.5 & Claude Sonnet 4.5), date: 2025‑11-1
+// Scope: Generated implementation based on API requirements.
+// Author review: Validated correctness, fixed bugs
+
 /**
  * Authentication Server Actions
  *
