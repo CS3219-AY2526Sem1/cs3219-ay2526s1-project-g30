@@ -35,8 +35,8 @@ let dbConnectionPromise
 
 // Connect to MongoDB
 dbConnectionPromise = MongoClient.connect(mongoOnlineUrl, {
-  serverSelectionTimeoutMS: 5000,
-  connectTimeoutMS: 10000,
+  serverSelectionTimeoutMS: 60000,
+  connectTimeoutMS: 60000,
   // CRITICAL: Add these TLS options
   tls: true,
   tlsAllowInvalidCertificates: true, // Needed for Cloud Run
