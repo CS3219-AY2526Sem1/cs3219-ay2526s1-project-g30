@@ -1,0 +1,94 @@
+# AI Assistance Disclosure:
+# Tool: ChatGPT (model: GPT‑5 Thinking), date: 2025‑10-31
+# Scope: Generated implementation based on requirements.
+# Author review: Validated correctness. Edited to fix bugs.
+
+steps:
+  - name: node:24
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        cd ui-service && \
+        npm ci && \
+        npm run test
+    id: Test
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        docker build \
+          --no-cache \
+          -t $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA \
+          --build-arg SESSION_SECRET=$$SESSION_SECRET \
+          --build-arg NEXT_PUBLIC_USER_SERVICE_URL=$$NEXT_PUBLIC_USER_SERVICE_URL \
+          --build-arg NEXT_PUBLIC_MATCHING_SERVICE_URL=$$NEXT_PUBLIC_MATCHING_SERVICE_URL \
+          --build-arg NEXT_PUBLIC_QUESTION_SERVICE_URL=$$NEXT_PUBLIC_QUESTION_SERVICE_URL \
+          --build-arg NEXT_PUBLIC_COLLAB_SERVICE_URL=$$NEXT_PUBLIC_COLLAB_SERVICE_URL \
+          --build-arg NEXT_PUBLIC_COLLAB_SERVICE_WS_URL=$$NEXT_PUBLIC_COLLAB_SERVICE_WS_URL \
+          -f ui-service/Dockerfile \
+          ui-service
+    id: Build
+    secretEnv: ['SESSION_SECRET', 'NEXT_PUBLIC_USER_SERVICE_URL', 'NEXT_PUBLIC_MATCHING_SERVICE_URL', 'NEXT_PUBLIC_QUESTION_SERVICE_URL', 'NEXT_PUBLIC_COLLAB_SERVICE_URL', 'NEXT_PUBLIC_COLLAB_SERVICE_WS_URL']
+    waitFor: ['Test']
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - >-
+        $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+    id: Push
+    waitFor: ['Build']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    args:
+      - run
+      - services
+      - update
+      - $_SERVICE_NAME
+      - '--platform=managed'
+      - >-
+        --image=$_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - >-
+        --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
+      - '--region=$_DEPLOY_REGION'
+      - '--quiet'
+    id: Deploy
+    entrypoint: gcloud
+    waitFor: ['Push']
+
+images:
+  - >-
+    $_AR_HOSTNAME/$_AR_PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _DEPLOY_REGION: asia-southeast1
+  _AR_HOSTNAME: asia-southeast1-docker.pkg.dev
+  _AR_REPOSITORY: cloud-run-source-deploy
+  _AR_PROJECT_ID: cs3219-peerprep-g30
+  _PLATFORM: managed
+  _SERVICE_NAME: cs3219-ay2526s1-project-g30
+  _TRIGGER_ID: 75ef2963-cd0e-4a56-892c-3ad1d15067be
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/cs3219-peerprep-g30/secrets/SESSION_SECRET/versions/latest
+    env: 'SESSION_SECRET'
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_USER_SERVICE_URL/versions/latest
+    env: 'NEXT_PUBLIC_USER_SERVICE_URL'
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_MATCHING_SERVICE_URL/versions/latest
+    env: 'NEXT_PUBLIC_MATCHING_SERVICE_URL'
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_QUESTION_SERVICE_URL/versions/latest
+    env: 'NEXT_PUBLIC_QUESTION_SERVICE_URL'
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_COLLAB_SERVICE_URL/versions/latest
+    env: 'NEXT_PUBLIC_COLLAB_SERVICE_URL'
+  - versionName: projects/cs3219-peerprep-g30/secrets/NEXT_PUBLIC_COLLAB_SERVICE_WS_URL/versions/latest
+    env: 'NEXT_PUBLIC_COLLAB_SERVICE_WS_URL'
+
+tags:
+  - gcp-cloud-build-deploy-cloud-run
+  - gcp-cloud-build-deploy-cloud-run-managed
+  - cs3219-ay2526s1-project-g30
