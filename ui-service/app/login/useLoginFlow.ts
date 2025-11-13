@@ -7,7 +7,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { requestPasswordReset } from '@/app/actions/auth'
+import { requestPasswordReset, updateUserProfile } from '@/app/actions/auth'
 
 export type ViewState =
   | 'email-entry'
@@ -50,7 +50,8 @@ export function useLoginFlow() {
     return ''
   }
 
-  const [state, setState] = useState<LoginFlowState>({
+  // Derive initial state based on searchParams
+  const initialState: LoginFlowState = {
     currentView: getInitialView(),
     emailInput: '',
     passwordInput: '',
@@ -61,11 +62,15 @@ export function useLoginFlow() {
     storedEmail: getInitialEmail(),
     storedPassword: '',
     isPending: false,
-  })
+  }
 
+  const [state, setState] = useState<LoginFlowState>(initialState)
+
+  // Clear history when step query param is present
   useEffect(() => {
     const step = searchParams.get('step')
-    if (step) {
+    const reset = searchParams.get('reset')
+    if (step || reset === 'true') {
       window.history.replaceState({}, '', '/login')
     }
   }, [searchParams])
@@ -121,8 +126,18 @@ export function useLoginFlow() {
   }
  
   const handleSkipSignupComplete = () => {
-    router.refresh()
-    router.push('/home')
+    // Send default profile data to ensure profile is properly initialised
+    const formData = new FormData()
+    const defaultDisplayName = state.storedEmail?.split('@')[0] || 'User'
+    formData.set('displayName', defaultDisplayName)
+    formData.set('preferredLanguage', 'java')
+    formData.set('experienceLevel', 'beginner')
+
+    startTransition(async () => {
+      await updateUserProfile(undefined, formData)
+      router.refresh()
+      router.push('/home')
+    })
   }
 
 

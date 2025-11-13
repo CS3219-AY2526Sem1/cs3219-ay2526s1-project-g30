@@ -45,9 +45,9 @@ function UserMenu({ user }: UserMenuProps) {
 
     const res = await logout()
 
-    // After server confirms logout, navigate to login page
+    // After server confirms logout, navigate to login page with reset query param
     if (!res || res.success) {
-      router.push('/login')
+      router.push('/login?reset=true')
     }
   }
 

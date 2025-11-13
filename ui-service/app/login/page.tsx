@@ -6,12 +6,21 @@
 'use client';
 
 import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { LoginContent } from './LoginContent';
+
+function LoginPageContent() {
+  const searchParams = useSearchParams();
+  const resetKey = searchParams.get('reset') === 'true' ? 'reset' : 'normal';
+  
+  return <LoginContent key={resetKey} />;
+}
 
 export default function LoginPage() {
   return (
     <Suspense>
-      <LoginContent />
+      <LoginPageContent />
     </Suspense>
   );
 }
+
