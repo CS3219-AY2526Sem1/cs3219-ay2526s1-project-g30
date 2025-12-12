@@ -1,0 +1,75 @@
+# Production - collab-service
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  # Pull the latest staging image
+  - name: gcr.io/cloud-builders/docker
+    id: Pull-Staging
+    args:
+      - pull
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/collab-service:latest
+
+  # Re-tag to production repository
+  - name: gcr.io/cloud-builders/docker
+    id: Tag-Production
+    args:
+      - tag
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-staging/collab-service:latest
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:latest
+    waitFor: ['Pull-Staging']
+
+  # Push to production repository
+  - name: gcr.io/cloud-builders/docker
+    id: Push-Production
+    args:
+      - push
+      - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:latest
+    waitFor: ['Tag-Production']
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Resolve-URLs
+    entrypoint: bash
+    args:
+      - -c
+      - |
+         USER_URL=$(gcloud run services describe user-service-production --region=asia-southeast1 --format='value(status.url)')
+         QN_URL=$(gcloud run services describe question-service-production --region=asia-southeast1 --format='value(status.url)')
+         COLLAB_URL=$(gcloud run services describe collab-service-production --region=asia-southeast1 --format='value(status.url)')
+         echo "USER_SERVICE=$$USER_URL/" >> urls.env
+         echo "QUESTION_SERVICE=$$QN_URL/" >> urls.env
+         echo "SERVER_URL=$$COLLAB_URL" >> urls.env
+    waitFor: ['Push-Production']
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        source urls.env
+        gcloud run deploy collab-service-production \
+          --image=asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:latest \
+          --region=asia-southeast1 \
+          --platform=managed \
+          --allow-unauthenticated \
+          --port=1234 \
+          --set-secrets=MONGO_DB_URL=MONGO_URI_COLLAB_SERVICE:latest \
+          --set-env-vars=QUESTION_SERVICE=$$QUESTION_SERVICE,USER_SERVICE=$$USER_SERVICE,SERVER_URL=$$SERVER_URL,SESSION_TIMEOUT=3600000,SESSION_UPDATE=60000 \
+          --memory=1Gi \
+          --cpu=2 \
+          --min-instances=1 \
+          --max-instances=100 \
+          --timeout=3600 \
+          --session-affinity
+    waitFor: ['Resolve-URLs']
+
+images:
+  - asia-southeast1-docker.pkg.dev/cs3219-peerprep-g30/peerprep-production/collab-service:latest
+
+tags:
+  - production
+  - collab-service
+
+timeout: 900s
+
